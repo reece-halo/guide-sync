@@ -34,7 +34,7 @@ function register_guide_and_faq_list() {
         'has_archive'        => true,
         'hierarchical'       => false,
         'menu_position'      => 20,
-        'supports'           => array( 'title', 'editor', 'author', 'thumbnail', 'excerpt', 'comments' ),
+        'supports'           => array( 'title', 'excerpt' ),
         'show_in_rest'       => true,
     );
 
