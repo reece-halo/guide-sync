@@ -4,43 +4,6 @@ if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
-// Hook to add a manual sync option in the Tools menu
-add_action( 'admin_menu', function () {
-    add_management_page(
-        'Guide Article Sync',
-        'Guide Article Sync',
-        'manage_options',
-        'guide-article-sync',
-        'render_guide_sync_page'
-    );
-} );
-
-// Render the sync page
-function render_guide_sync_page() {
-    ?>
-    <div class="wrap">
-        <h1>Sync Guide Articles</h1>
-        <p>Click the button below to sync guide articles from the external API.</p>
-        <form method="post" action="">
-            <?php
-            wp_nonce_field( 'guide_sync_action', 'guide_sync_nonce' );
-            submit_button( 'Sync Articles' );
-            ?>
-        </form>
-        <?php
-        if ( $_SERVER['REQUEST_METHOD'] === 'POST' && isset( $_POST['guide_sync_nonce'] ) ) {
-            if ( ! wp_verify_nonce( $_POST['guide_sync_nonce'], 'guide_sync_action' ) ) {
-                wp_die( esc_html__( 'Nonce verification failed.', 'text-domain' ) );
-            }
-
-            sync_guide_articles();
-            echo '<div class="notice notice-success"><p>' . esc_html__( 'Guide articles synced successfully!', 'text-domain' ) . '</p></div>';
-        }
-        ?>
-    </div>
-    <?php
-}
-
 // Sync guide articles
 function sync_guide_articles() {
     $api_url = 'https://halo.haloservicedesk.com/api/KBArticle?count=5000&type=0&isportal=true';
@@ -193,10 +156,19 @@ function delete_removed_articles( $synced_ids ) {
 }
 
 function build_content( $details ) {
-    $htmlContent = '<h1>Description</h1>';
-    $htmlContent .= ! empty( $details['description_html'] ) ? $details['description_html'] : esc_html( $details['description'] );
-    $htmlContent .= '<h1>Resolution</h1>';
-    $htmlContent .= ! empty( $details['resolution_html'] ) ? $details['resolution_html'] : esc_html( $details['resolution'] );
+    $htmlContent = '';
+
+    // Add the description section if it exists
+    if ( ! empty( $details['description_html'] ) ) {
+        $htmlContent .= '<h3>Description</h3>';
+        $htmlContent .= $details['description_html'];
+    }
+
+    // Add the resolution section if it exists
+    if ( ! empty( $details['resolution_html'] ) ) {
+        $htmlContent .= '<h3>Resolution</h3>';
+        $htmlContent .= $details['resolution_html'];
+    }
 
     return $htmlContent;
 }
