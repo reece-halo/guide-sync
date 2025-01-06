@@ -13,7 +13,8 @@ function faqListsForHaloPSA( $faq_name ) {
         $faq_name === 'administrator-guides' ||
         $faq_name === 'halopsa-guides' ||
         $faq_name === 'user-guides' ||
-        $faq_name === 'security'
+        $faq_name === 'security' ||
+        $faq_name === 'halopsa-website'
     );
 }
 
