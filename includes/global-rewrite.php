@@ -20,7 +20,7 @@ add_action( 'init', function () {
     );
 } );
 
-// Register query variables
+// Register custom query variables
 add_filter( 'query_vars', function ( $vars ) {
     $vars[] = 'product';
     $vars[] = 'external_article_id';
@@ -29,7 +29,6 @@ add_filter( 'query_vars', function ( $vars ) {
 
 // Validate the product based on FAQ lists
 function validate_product_for_article( $product, $post_id ) {
-    // Get FAQ lists associated with the post
     $faq_lists = wp_get_object_terms( $post_id, 'faq_list' );
 
     if ( empty( $faq_lists ) ) {
@@ -42,9 +41,8 @@ function validate_product_for_article( $product, $post_id ) {
 
         if ( $root_faq ) {
             $root_faq_name = strtolower( sanitize_title( $root_faq->name ) );
-            error_log($root_faq_name);
 
-            // Define your product-to-FAQ list rules
+            // Define product-to-FAQ list rules
             if ( faqListsForHaloCRM( $root_faq_name ) && $product === 'halocrm' ) {
                 return true;
             }
@@ -66,28 +64,43 @@ add_action( 'pre_get_posts', function ( $query ) {
         $product = get_query_var( 'product' );
         $external_article_id = get_query_var( 'external_article_id' );
 
-        // If both product and article ID are specified, validate them
         if ( $product && $external_article_id ) {
-            // Get the post with the given external_article_id
             $post = get_posts( [
-                'post_type'  => 'guide',
-                'meta_key'   => 'external_article_id',
-                'meta_value' => $external_article_id,
+                'post_type'   => 'guide',
+                'meta_key'    => 'external_article_id',
+                'meta_value'  => $external_article_id,
                 'numberposts' => 1,
             ] );
 
             if ( empty( $post ) || ! validate_product_for_article( $product, $post[0]->ID ) ) {
-                // Product does not match or post not found, display 404
                 $query->set_404();
                 status_header( 404 );
                 return;
             }
 
-            // Otherwise, adjust the query to fetch the correct post
+            // Adjust the query to fetch the correct post
             $query->set( 'p', $post[0]->ID );
             $query->set( 'post_type', 'guide' );
+        } elseif ( $product || $external_article_id ) {
+            // Either product or external_article_id is missing
+            $query->set_404();
+            status_header( 404 );
         }
     }
+} );
+
+// Add template handling for custom guide template
+add_filter( 'template_include', function ( $template ) {
+    if ( get_query_var( 'product' ) && get_query_var( 'external_article_id' ) ) {
+        $custom_template = locate_template( 'single-guide.php' );
+
+        // If a custom guide template exists, use it
+        if ( $custom_template ) {
+            return $custom_template;
+        }
+    }
+
+    return $template;
 } );
 
 // Flush rewrite rules on plugin activation
