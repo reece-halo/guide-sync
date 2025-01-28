@@ -25,6 +25,8 @@ require_once plugin_dir_path( __FILE__ ) . 'includes/url-rewrite.php';
 
 require_once plugin_dir_path( __FILE__ ) . 'includes/global-rewrite.php';
 
+require_once plugin_dir_path( __FILE__ ) . 'includes/overview-component.php';
+
 
 
 
