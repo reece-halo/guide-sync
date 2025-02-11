@@ -1,0 +1,154 @@
+/*Guide Sync Styling - Reece English*/
+/* 🌟 FAQ List Hierarchy (Cleaned Up) */
+.faq-list-hierarchy {
+    font-family: "Inter", sans-serif;
+    line-height: 1.5;
+    margin: 0 auto;
+    padding: 0;
+    max-width: 900px;
+}
+
+/* 🌟 FAQ Cards (Cleaner, More Compact) */
+.faq-card {
+    background: #fff;
+    padding: 14px 16px;
+    border-radius: 8px;
+    border: 1px solid #e0e0e0;
+    box-shadow: 0px 2px 6px rgba(0, 0, 0, 0.05);
+    margin-bottom: 10px;
+    transition: all 0.2s ease-in-out;
+    position: relative;
+    cursor: pointer;
+}
+
+.faq-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0px 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+/* 🌟 FAQ Titles */
+.faq-title {
+    font-weight: 600;
+    color: #222;
+    font-size: 18px;
+    margin-bottom: 6px;
+    transition: color 0.2s ease-in-out;
+}
+
+.faq-title:hover {
+    color: #0073aa;
+}
+
+/* 🌟 FAQ Subtitles (Hierarchy Levels) */
+.faq-subtitle {
+    font-weight: 500;
+    color: #444;
+    font-size: 16px;
+    margin-bottom: 6px;
+    padding-bottom: 4px;
+    border-bottom: 1px solid #ddd;
+    position: relative;
+}
+
+/* 🌟 Subtle Arrows for Subsections */
+.faq-subtitle::before {
+    content: "➜";
+    position: absolute;
+    left: -16px;
+    color: #0073aa;
+    font-size: 16px;
+    transition: transform 0.2s ease-in-out;
+}
+
+/* 🌟 Guide List */
+.guide-list {
+    list-style: none;
+    padding-left: 0;
+    margin-top: 8px;
+}
+
+/* 🌟 Guide Items (More Compact, Cleaner Hover) */
+.guide-item {
+    padding: 8px;
+    border-radius: 6px;
+    background: #f9f9f9;
+    transition: background 0.2s ease-in-out, transform 0.2s ease-in-out;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.guide-item:hover {
+    background: #eef7ff;
+    transform: translateX(3px);
+}
+
+/* 🌟 Guide Links */
+.guide-item a {
+    color: #0073aa;
+    text-decoration: none;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    transition: color 0.2s ease-in-out;
+}
+
+.guide-item a:hover {
+    color: #005f8d;
+    text-decoration: underline;
+}
+
+/* 🌟 Hierarchy Indentation (More Compact) */
+.faq-child-columns {
+    margin-left: 16px;
+    padding-left: 10px;
+    /*border-left: 2px solid #e0e0e0;*/
+    transition: all 0.2s ease-in-out;
+}
+
+/* 🌟 Responsive Design */
+@media screen and (max-width: 768px) {
+    .faq-list-hierarchy {
+        padding: 0;
+    }
+
+    .faq-title {
+        font-size: 16px;
+    }
+
+    .faq-subtitle {
+        font-size: 14px;
+    }
+
+    .guide-item {
+        padding: 6px;
+    }
+
+    .faq-child-columns {
+        margin-left: 10px;
+        border-left: 1px solid #ccc;
+    }
+}
+
+.faq-search-container {
+    margin-bottom: 16px;
+    text-align: center;
+}
+
+#faq-search {
+    width: 100%;
+    max-width: 500px;
+    padding: 10px;
+    font-size: 16px;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    box-shadow: inset 0px 2px 4px rgba(0, 0, 0, 0.05);
+    outline: none;
+    transition: all 0.2s ease-in-out;
+}
+
+#faq-search:focus {
+    border-color: #0073aa;
+    box-shadow: 0px 0px 8px rgba(0, 115, 170, 0.3);
+}

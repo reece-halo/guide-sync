@@ -108,26 +108,33 @@ function sync_article( $article ) {
 
 function assign_article_taxonomies( $post_id, $faqlists ) {
     $faq_ids = [];
+
     foreach ( $faqlists as $faqlist ) {
-        $term = get_term_by( 'name', $faqlist['name'], 'faq_list' );
+        // Get the term using a meta query on halo_id
+        $terms = get_terms([
+            'taxonomy'   => 'faq_list',
+            'hide_empty' => false,
+            'meta_query' => [
+                [
+                    'key'     => 'halo_id',
+                    'value'   => $faqlist['id'],
+                    'compare' => '='
+                ]
+            ]
+        ]);
 
-        if ( ! $term ) {
-            $term_result = wp_insert_term( $faqlist['name'], 'faq_list', [
-                'slug' => sanitize_title( $faqlist['name'] ),
-            ] );
-
-            if ( ! is_wp_error( $term_result ) ) {
-                $term = get_term( $term_result['term_id'], 'faq_list' );
-            } else {
-                error_log( 'Error inserting term: ' . $term_result->get_error_message() );
-                continue;
-            }
+        // If term exists, get its ID
+        if ( ! empty( $terms ) && ! is_wp_error( $terms ) ) {
+            $term = $terms[0];
+            $faq_ids[] = $term->term_id;
+        } else {
+            error_log( 'FAQ term not found for Halo ID: ' . $faqlist['id'] );
         }
-
-        $faq_ids[] = $term->term_id;
     }
 
-    wp_set_object_terms( $post_id, $faq_ids, 'faq_list' );
+    if ( ! empty( $faq_ids ) ) {
+        wp_set_object_terms( $post_id, $faq_ids, 'faq_list' );
+    }
 }
 
 function get_post_id_by_meta_key_and_value( $meta_key, $meta_value ) {
