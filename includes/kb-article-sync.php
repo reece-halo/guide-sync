@@ -167,14 +167,16 @@ function build_content( $details ) {
 
     // Add the description section if it exists
     if ( ! empty( $details['description_html'] ) ) {
-        $htmlContent .= '<h3>Description</h3>';
+        $htmlContent .= '<div class="guide-description">';
         $htmlContent .= $details['description_html'];
+        $htmlContent .= '</div>';
     }
 
     // Add the resolution section if it exists
     if ( ! empty( $details['resolution_html'] ) ) {
-        $htmlContent .= '<h3>Resolution</h3>';
+        $htmlContent .= '<div class="guide-resolution">';
         $htmlContent .= $details['resolution_html'];
+        $htmlContent .= '</div>';
     }
 
     return $htmlContent;
