@@ -21,9 +21,9 @@ require_once plugin_dir_path( __FILE__ ) . 'includes/faq-list-sync.php';
 
 require_once plugin_dir_path( __FILE__ ) . 'includes/kb-article-sync.php';
 
-require_once plugin_dir_path( __FILE__ ) . 'includes/url-rewrite.php';
+// require_once plugin_dir_path( __FILE__ ) . 'includes/url-rewrite.php';
 
-require_once plugin_dir_path( __FILE__ ) . 'includes/global-rewrite.php';
+// require_once plugin_dir_path( __FILE__ ) . 'includes/global-rewrite.php';
 
 require_once plugin_dir_path( __FILE__ ) . 'includes/overview-component.php';
 
