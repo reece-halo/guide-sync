@@ -126,6 +126,10 @@ function display_faq_list_hierarchy_ajax( $atts ) {
 		background: #fff;
 	}
 
+	.faq-main img {
+		object-fit: contain;
+	}
+
 	.faq-search-container {
 		margin-bottom: 15px;
 	}
