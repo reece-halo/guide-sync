@@ -217,9 +217,7 @@ function display_faq_list_hierarchy_ajax( $atts ) {
 			border-bottom: 1px solid #e0e0e0;
 		}
 	}
-</style>
-
-
+	</style>
 
 	<!-- The data-baseurl attribute is used by the JS to update the URL dynamically -->
 	<div class="faq-component" data-baseurl="<?php echo esc_url( $current_permalink ); ?>">
@@ -299,53 +297,67 @@ function display_faq_list_hierarchy_ajax( $atts ) {
 			}
 
 			/**
-			 * Recursively check a FAQ sidebar item and its descendants.
-			 * If the item's header text or any guide link text contains the filter,
-			 * the item remains visible; otherwise it is hidden.
-			 * Also expands child containers if any descendant matches.
-			 */
-			function filterItem(item, filter) {
-				var header = item.querySelector('.faq-term-header');
-				var headerText = header ? header.textContent.toLowerCase() : '';
-				var matches = headerText.indexOf(filter) !== -1;
-
-				// Check any guide links inside this item.
-				var guides = item.querySelectorAll('.faq-guide-link');
-				guides.forEach(function(guide) {
-					if ( guide.textContent.toLowerCase().indexOf(filter) !== -1 ) {
-						matches = true;
-					}
-				});
-
-				// Recursively check child FAQ items.
-				var childrenContainer = item.querySelector('.faq-children');
-				if ( childrenContainer ) {
-					var childItems = childrenContainer.querySelectorAll('.faq-sidebar-item');
-					var anyChildMatches = false;
-					childItems.forEach(function(childItem) {
-						if ( filterItem(childItem, filter) ) {
-							anyChildMatches = true;
-						}
-					});
-					// Expand children if any child matched.
-					childrenContainer.style.display = anyChildMatches ? 'block' : 'none';
-					matches = matches || anyChildMatches;
-				}
-
-				// Show or hide this item.
-				item.style.display = matches ? '' : 'none';
-				return matches;
-			}
-
-			/**
 			 * Filter the entire FAQ sidebar based on the search term.
+			 * When a guide title or a category name matches, that guide (and its parents)
+			 * become visible.
 			 */
 			window.filterFAQ = function(){
 				var input = document.getElementById('faq-search');
 				var filter = input.value.toLowerCase();
-				var topItems = document.querySelectorAll('.faq-sidebar-list.level-0 > .faq-sidebar-item');
-				topItems.forEach(function(item){
-					filterItem(item, filter);
+
+				// If no search term, reset everything to default
+				if(filter === ''){
+					document.querySelectorAll('.faq-sidebar-item').forEach(function(item){
+						item.style.display = '';
+					});
+					document.querySelectorAll('.faq-children').forEach(function(child){
+						child.style.display = 'none';
+					});
+					return;
+				}
+
+				// First, hide all FAQ sidebar items and guide items
+				document.querySelectorAll('.faq-sidebar-item').forEach(function(item){
+					item.style.display = 'none';
+				});
+				document.querySelectorAll('.faq-guide-item').forEach(function(guideItem){
+					guideItem.style.display = 'none';
+				});
+
+				// Check each guide link for a match against the search term.
+				var allGuideLinks = document.querySelectorAll('.faq-guide-link');
+				allGuideLinks.forEach(function(guideLink) {
+					if( guideLink.textContent.toLowerCase().indexOf(filter) !== -1 ) {
+						// Show the guide's list item.
+						var guideItem = guideLink.closest('.faq-guide-item');
+						if(guideItem){
+							guideItem.style.display = '';
+						}
+						// Ensure that the parent term and any ancestors are shown and expanded.
+						var parentItem = guideLink.closest('.faq-sidebar-item');
+						while(parentItem) {
+							parentItem.style.display = '';
+							var childrenContainer = parentItem.querySelector('.faq-children');
+							if(childrenContainer) {
+								childrenContainer.style.display = 'block';
+							}
+							parentItem = parentItem.parentElement.closest('.faq-sidebar-item');
+						}
+					}
+				});
+
+				// Also check category headers in case the term name matches.
+				document.querySelectorAll('.faq-term-header').forEach(function(header){
+					if(header.textContent.toLowerCase().indexOf(filter) !== -1) {
+						var parentItem = header.closest('.faq-sidebar-item');
+						if(parentItem) {
+							parentItem.style.display = '';
+							var childrenContainer = parentItem.querySelector('.faq-children');
+							if(childrenContainer) {
+								childrenContainer.style.display = 'block';
+							}
+						}
+					}
 				});
 			};
 
