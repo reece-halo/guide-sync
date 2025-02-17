@@ -266,6 +266,10 @@ function display_faq_list_hierarchy_ajax( $atts ) {
 					// Update the URL using the base URL from the component's data attribute.
 					var baseUrl = document.querySelector('.faq-component').getAttribute('data-baseurl');
 					history.pushState(null, '', baseUrl + guideIdentifier);
+					// Scroll to the top of the FAQ component, offset by 20px.
+					var faqComponent = document.querySelector('.faq-component');
+					var offset = faqComponent.getBoundingClientRect().top + window.pageYOffset - 120;
+					window.scrollTo({ top: offset, behavior: 'smooth' });
 				});
 			});
 
