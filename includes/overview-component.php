@@ -99,31 +99,31 @@ function display_faq_list_hierarchy_ajax( $atts ) {
 	<style>
 	.faq-component {
 		display: flex;
-		align-items: stretch; /* Ensure both sidebar and main stretch to the same height */
-		max-width: 1200px;
+		align-items: flex-start;
+		max-width: 1400px;
 		margin: 30px auto;
-		font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
 		background: #fff;
-		box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-		border-radius: 15px;
-		overflow: hidden;
-        color: black;
+		color: black;
+		position: relative;
+		overflow: visible !important;
 	}
 
 	.faq-sidebar {
 		flex: 0 0 300px; /* Fixed width */
-		background: #F5F7FA;
 		padding: 20px;
 		overflow-y: auto;
-		/* Remove max-height so the sidebar stretches to match the guide content */
-		border-right: 1px solid #e0e0e0;
-		box-shadow: inset -2px 0 8px rgba(0, 0, 0, 0.05);
+		/*border-right: 1px solid #e0e0e0;*/
+		position: sticky;
+		top: 20px;
+		height: fit-content;
+		align-self: flex-start;
 	}
 
 	.faq-main {
 		flex: 1;
 		padding: 30px;
 		background: #fff;
+		border-left: 1px solid #e0e0e0;
 	}
 
 	.faq-main img {
@@ -220,6 +220,12 @@ function display_faq_list_hierarchy_ajax( $atts ) {
 			border-right: none;
 			border-bottom: 1px solid #e0e0e0;
 		}
+		.faq-main {
+    		flex: 1;
+    		padding: 30px;
+    		background: #fff;
+    		border-left: none;
+    	}
 	}
 	</style>
 
