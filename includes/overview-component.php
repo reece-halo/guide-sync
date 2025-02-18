@@ -99,20 +99,19 @@ function display_faq_list_hierarchy_ajax( $atts ) {
 	<style>
 	.faq-component {
 		display: flex;
-		align-items: flex-start;
-		max-width: 1400px;
+		align-items: flex-start; /* Ensure children align from the top */
+		max-width: 1200px;
 		margin: 30px auto;
+		font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
 		background: #fff;
 		color: black;
-		position: relative;
-		overflow: visible !important;
+		position: relative; /* Important for sticky positioning */
 	}
 
 	.faq-sidebar {
 		flex: 0 0 300px; /* Fixed width */
 		padding: 20px;
 		overflow-y: auto;
-		/*border-right: 1px solid #e0e0e0;*/
 		position: sticky;
 		top: 20px;
 		height: fit-content;
@@ -154,15 +153,19 @@ function display_faq_list_hierarchy_ajax( $atts ) {
 	}
 
 	.faq-term-header {
-		display: block;
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
 		padding: 12px 15px;
 		background: #ffffff;
 		border-radius: 8px;
-		color: #333;
+		/* Ensure FAQ term text is black */
+		color: #000 !important;
 		text-decoration: none;
 		font-size: 16px;
 		transition: background 0.3s ease, transform 0.2s ease;
 		box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+		cursor: pointer;
 	}
 
 	.faq-term-header:hover {
@@ -173,7 +176,17 @@ function display_faq_list_hierarchy_ajax( $atts ) {
 	.faq-term-header.active,
 	.faq-term-header.active:hover {
 		background: #00acc1;
-		color: #fff;
+		/* Active state still shows black text */
+		color: #000 !important;
+	}
+
+	/* Chevron styles */
+	.faq-term-header .chevron {
+		font-size: 12px;
+		transition: transform 0.3s ease;
+	}
+	.faq-term-header .chevron.expanded {
+		transform: rotate(90deg);
 	}
 
 	.faq-children {
@@ -194,7 +207,8 @@ function display_faq_list_hierarchy_ajax( $atts ) {
 		padding: 10px 12px;
 		background: #fff;
 		border-radius: 8px;
-		color: #0073aa;
+		/* Ensure FAQ guide link text is black */
+		color: #000 !important;
 		text-decoration: none;
 		font-size: 15px;
 		transition: background 0.3s ease, color 0.3s ease, transform 0.2s ease;
@@ -208,7 +222,8 @@ function display_faq_list_hierarchy_ajax( $atts ) {
 
 	.faq-guide-link.active {
 		background: #0073aa;
-		color: #fff;
+		/* Active state also shows black text */
+		color: white !important;
 	}
 
 	@media (max-width: 768px) {
@@ -220,12 +235,6 @@ function display_faq_list_hierarchy_ajax( $atts ) {
 			border-right: none;
 			border-bottom: 1px solid #e0e0e0;
 		}
-		.faq-main {
-    		flex: 1;
-    		padding: 30px;
-    		background: #fff;
-    		border-left: none;
-    	}
 	}
 	</style>
 
@@ -258,8 +267,19 @@ function display_faq_list_hierarchy_ajax( $atts ) {
 					e.preventDefault();
 					var parentItem = this.parentElement;
 					var childContainer = parentItem.querySelector('.faq-children');
+					// Only toggle if child container exists.
 					if ( childContainer ) {
+						// Toggle display.
 						childContainer.style.display = ( childContainer.style.display === 'none' || childContainer.style.display === '' ) ? 'block' : 'none';
+						// Toggle chevron direction.
+						var chevron = this.querySelector('.chevron');
+						if ( chevron ) {
+							if ( childContainer.style.display === 'block' ) {
+								chevron.classList.add('expanded');
+							} else {
+								chevron.classList.remove('expanded');
+							}
+						}
 					}
 				});
 			});
@@ -268,7 +288,7 @@ function display_faq_list_hierarchy_ajax( $atts ) {
 			document.querySelectorAll('.faq-guide-link').forEach(function(link) {
 				link.addEventListener('click', function(e) {
 					e.preventDefault();
-					// data-guide-slug now contains the guide identifier (external_article_id if set, fallback to post name otherwise).
+					// data-guide-slug now contains the guide identifier.
 					var guideIdentifier = this.getAttribute('data-guide-slug');
 					loadGuideContent(guideIdentifier);
 					document.querySelectorAll('.faq-guide-link').forEach(function(l) { l.classList.remove('active'); });
@@ -327,6 +347,10 @@ function display_faq_list_hierarchy_ajax( $atts ) {
 					document.querySelectorAll('.faq-children').forEach(function(child){
 						child.style.display = 'none';
 					});
+					// Reset chevron direction.
+					document.querySelectorAll('.faq-term-header .chevron').forEach(function(chevron){
+						chevron.classList.remove('expanded');
+					});
 					return;
 				}
 
@@ -354,6 +378,10 @@ function display_faq_list_hierarchy_ajax( $atts ) {
 							var childrenContainer = parentItem.querySelector('.faq-children');
 							if(childrenContainer) {
 								childrenContainer.style.display = 'block';
+								var chevron = parentItem.querySelector('.faq-term-header .chevron');
+								if(chevron){
+									chevron.classList.add('expanded');
+								}
 							}
 							parentItem = parentItem.parentElement.closest('.faq-sidebar-item');
 						}
@@ -369,6 +397,10 @@ function display_faq_list_hierarchy_ajax( $atts ) {
 							var childrenContainer = parentItem.querySelector('.faq-children');
 							if(childrenContainer) {
 								childrenContainer.style.display = 'block';
+								var chevron = header.querySelector('.chevron');
+								if(chevron){
+									chevron.classList.add('expanded');
+								}
 							}
 						}
 					}
@@ -386,6 +418,10 @@ function display_faq_list_hierarchy_ajax( $atts ) {
 							var childrenContainer = parent.querySelector('.faq-children');
 							if ( childrenContainer ) {
 								childrenContainer.style.display = 'block';
+								var chevron = parent.querySelector('.faq-term-header .chevron');
+								if(chevron){
+									chevron.classList.add('expanded');
+								}
 							}
 							parent = parent.parentElement.closest('.faq-sidebar-item');
 						}
@@ -414,11 +450,16 @@ function build_faq_sidebar_ajax( $parent_id, $taxonomy, $atts, $level = 0 ) {
 	}
 	$output = '<ul class="faq-sidebar-list level-' . $level . '">';
 	foreach ( $terms as $term ) {
-		$output .= '<li class="faq-sidebar-item" data-term-id="' . esc_attr( $term->term_id ) . '">';
-		$output .= '<a href="#" class="faq-term-header">' . esc_html( $term->name ) . '</a>';
 		$children = build_faq_sidebar_ajax( $term->term_id, $taxonomy, $atts, $level + 1 );
 		$guides   = build_guides_list_ajax( $term->term_id, $atts );
-		if ( $children || $guides ) {
+		$has_children = ( $children || $guides ) ? true : false;
+		$output .= '<li class="faq-sidebar-item" data-term-id="' . esc_attr( $term->term_id ) . '">';
+		if ( $has_children ) {
+			$output .= '<a href="#" class="faq-term-header"><span class="term-title">' . esc_html( $term->name ) . '</span><span class="chevron">▶</span></a>';
+		} else {
+			$output .= '<a href="#" class="faq-term-header"><span class="term-title">' . esc_html( $term->name ) . '</span></a>';
+		}
+		if ( $has_children ) {
 			$output .= '<div class="faq-children" style="display:none;">';
 			if ( $children ) {
 				$output .= $children;
