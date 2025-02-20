@@ -18,17 +18,10 @@ require_once plugin_dir_path( __FILE__ ) . 'includes/register-posts-and-taxonomy
 add_action( 'init', 'register_guide_and_faq_list' );
 
 require_once plugin_dir_path( __FILE__ ) . 'includes/faq-list-sync.php';
-
 require_once plugin_dir_path( __FILE__ ) . 'includes/kb-article-sync.php';
-
 // require_once plugin_dir_path( __FILE__ ) . 'includes/url-rewrite.php';
-
 // require_once plugin_dir_path( __FILE__ ) . 'includes/global-rewrite.php';
-
 require_once plugin_dir_path( __FILE__ ) . 'includes/overview-component.php';
-
-
-
 
 // CRON Jobs for Automated Sync
 function sync_faqs_and_articles() {
@@ -62,6 +55,17 @@ function sync_faqs_and_articles() {
     file_put_contents( $log_file, $log_message, FILE_APPEND );
 }
 
+// New function that removes the sanitization filter before syncing
+function sync_faqs_and_articles_with_removed_filter() {
+    // Remove the HTML sanitization filter for this request
+    remove_filter( 'content_save_pre', 'wp_filter_post_kses' );
+    
+    // Run the sync process
+    sync_faqs_and_articles();
+
+    // Optionally, re-add the filter if needed later in the request
+    // add_filter( 'content_save_pre', 'wp_filter_post_kses' );
+}
 
 // Schedule the cron job on theme/plugin activation
 function setup_faq_and_article_sync_cron() {
@@ -90,8 +94,8 @@ function add_two_hours_cron_interval( $schedules ) {
 }
 add_filter( 'cron_schedules', 'add_two_hours_cron_interval' );
 
-// Hook the cron event to the sync function
-add_action( 'sync_faq_and_articles_cron', 'sync_faqs_and_articles' );
+// Hook the cron event to the new sync function that removes the filter
+add_action( 'sync_faq_and_articles_cron', 'sync_faqs_and_articles_with_removed_filter' );
 
 // Add a manual sync option in the Tools menu
 add_action( 'admin_menu', function () {
@@ -122,7 +126,7 @@ function render_manual_sync_page() {
                 wp_die( esc_html__( 'Nonce verification failed.', 'text-domain' ) );
             }
 
-            // Trigger the sync process
+            // Trigger the sync process without removing the filter (manual sync remains unchanged)
             sync_faqs_and_articles();
 
             echo '<div class="notice notice-success"><p>' . esc_html__( 'Manual sync completed successfully!', 'text-domain' ) . '</p></div>';
