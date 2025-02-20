@@ -141,15 +141,52 @@ function display_faq_list_hierarchy_ajax( $atts ) {
 		height: fit-content;
 		align-self: flex-start;
 	}
-	.faq-main {
-		flex: 1;
-		padding: 30px;
-		background: #fff;
-		border-left: 1px solid #e0e0e0;
-	}
-	.faq-main img {
-		object-fit: contain;
-	}
+	/* Base Article Container */
+    .faq-main {
+      flex: 1;
+      padding: 30px;
+      background: #fff;
+      /* border-left: 1px solid #e0e0e0; */
+    }
+    
+    /* Headings */
+    .faq-main h1 {
+      font-size: 2rem;
+      margin: 0 0 10px;
+      border-bottom: 1px solid #e0e0e0;
+      padding-bottom: 15px;
+    }
+    
+    /* Secondary Headings */
+    .faq-main h2,
+    .faq-main h3,
+    .faq-main h4,
+    .faq-main h5,
+    .faq-main h6 {
+      margin-top: 20px;
+      margin-bottom: 10px;
+    }
+    
+    /* Paragraphs */
+    .faq-main p {
+      margin: 1em 0;
+      line-height: 1.6;
+    }
+    
+    /* Lists (Ordered & Unordered) */
+    .faq-main ul,
+    .faq-main ol {
+      margin: 1em 0;
+      padding-left: 20px;
+    }
+    
+    /* Images */
+    .faq-main img {
+      max-width: 100%;
+      height: auto;
+      object-fit: contain;
+      margin: 20px 0;
+    }
 	.faq-search-container {
 		margin-bottom: 15px;
 	}
