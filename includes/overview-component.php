@@ -5,15 +5,40 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 /**
- * Register a rewrite rule so that guide URLs like:
- * /{product}/guides/{guide_identifier}
- * load the guides page and set the query var 'faq_guide'.
+ * Enqueue Font Awesome for the FAQ components.
+ */
+function faq_enqueue_fontawesome() {
+	wp_enqueue_style( 'font-awesome', 'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css', array(), '6.4.0' );
+}
+add_action( 'wp_enqueue_scripts', 'faq_enqueue_fontawesome' );
+
+/**
+ * Register rewrite rules.
+ * 
+ * - The first rule catches URLs like /guides and sets a query var so we can redirect to /halopsa/guides.
+ * - The second rule handles guide URLs in the format /{product}/guides/{guide_identifier}.
  */
 add_action( 'init', 'faq_register_rewrite_rules' );
 function faq_register_rewrite_rules() {
-	// Assumes your product pages are structured as: domain/{product}/guides
+	// If a user visits /guides, set a query var so we can redirect.
+	add_rewrite_rule( '^guides/?$', 'index.php?guides_redirect=1', 'top' );
+	
+	// Assumes your product pages are structured as: domain/{product}/guides/{guide_identifier}
 	add_rewrite_rule( '^([^/]+)/guides/([^/]+)/?$', 'index.php?pagename=$matches[1]/guides&faq_guide=$matches[2]', 'top' );
+	
 	add_rewrite_tag( '%faq_guide%', '([^&]+)' );
+	add_rewrite_tag( '%guides_redirect%', '([^&]+)' );
+}
+
+/**
+ * Template redirect: if the URL includes guides_redirect, redirect to /halopsa/guides.
+ */
+add_action( 'template_redirect', 'faq_redirect_guides_to_halopsa' );
+function faq_redirect_guides_to_halopsa() {
+	if ( get_query_var( 'guides_redirect' ) === '1' ) {
+		wp_redirect( home_url( '/halopsa/guides' ), 301 );
+		exit;
+	}
 }
 
 /**
@@ -99,17 +124,16 @@ function display_faq_list_hierarchy_ajax( $atts ) {
 	<style>
 	.faq-component {
 		display: flex;
-		align-items: flex-start; /* Ensure children align from the top */
+		align-items: flex-start;
 		max-width: 1200px;
 		margin: 30px auto;
 		font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
 		background: #fff;
 		color: black;
-		position: relative; /* Important for sticky positioning */
+		position: relative;
 	}
-
 	.faq-sidebar {
-		flex: 0 0 300px; /* Fixed width */
+		flex: 0 0 300px;
 		padding: 20px;
 		overflow-y: auto;
 		position: sticky;
@@ -117,22 +141,18 @@ function display_faq_list_hierarchy_ajax( $atts ) {
 		height: fit-content;
 		align-self: flex-start;
 	}
-
 	.faq-main {
 		flex: 1;
 		padding: 30px;
 		background: #fff;
 		border-left: 1px solid #e0e0e0;
 	}
-
 	.faq-main img {
 		object-fit: contain;
 	}
-
 	.faq-search-container {
 		margin-bottom: 15px;
 	}
-
 	#faq-search {
 		width: 100%;
 		padding: 10px 15px;
@@ -141,25 +161,21 @@ function display_faq_list_hierarchy_ajax( $atts ) {
 		box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.1);
 		font-size: 16px;
 	}
-
 	.faq-sidebar-list {
 		list-style: none;
 		padding-left: 0;
 		margin: 0;
 	}
-
 	.faq-sidebar-list li {
 		margin-bottom: 10px;
 	}
-
 	.faq-term-header {
 		display: flex;
 		align-items: center;
-		justify-content: space-between;
+		justify-content: flex-start;
 		padding: 12px 15px;
 		background: #ffffff;
 		border-radius: 8px;
-		/* Ensure FAQ term text is black */
 		color: #000 !important;
 		text-decoration: none;
 		font-size: 16px;
@@ -167,65 +183,44 @@ function display_faq_list_hierarchy_ajax( $atts ) {
 		box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
 		cursor: pointer;
 	}
-
-	.faq-term-header:hover {
-		background: #e0f7fa;
-		transform: translateX(5px);
-	}
-
-	.faq-term-header.active,
-	.faq-term-header.active:hover {
-		background: #00acc1;
-		/* Active state still shows black text */
-		color: #000 !important;
-	}
-
-	/* Chevron styles */
 	.faq-term-header .chevron {
+		margin-right: 10px;
 		font-size: 12px;
 		transition: transform 0.3s ease;
 	}
 	.faq-term-header .chevron.expanded {
 		transform: rotate(90deg);
 	}
-
 	.faq-children {
 		margin-left: 20px;
 		margin-top: 8px;
 		padding-left: 10px;
 		border-left: 2px solid #ddd;
 	}
-
 	.faq-guides-list {
 		list-style: none;
 		padding-left: 0;
 		margin-top: 10px;
 	}
-
 	.faq-guide-link {
 		display: block;
 		padding: 10px 12px;
 		background: #fff;
 		border-radius: 8px;
-		/* Ensure FAQ guide link text is black */
 		color: #000 !important;
 		text-decoration: none;
 		font-size: 15px;
 		transition: background 0.3s ease, color 0.3s ease, transform 0.2s ease;
 		box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
 	}
-
 	.faq-guide-link:hover {
 		background: #e1f5fe;
 		transform: translateX(3px);
 	}
-
 	.faq-guide-link.active {
 		background: #0073aa;
-		/* Active state also shows black text */
 		color: white !important;
 	}
-
 	@media (max-width: 768px) {
 		.faq-component {
 			flex-direction: column;
@@ -267,11 +262,8 @@ function display_faq_list_hierarchy_ajax( $atts ) {
 					e.preventDefault();
 					var parentItem = this.parentElement;
 					var childContainer = parentItem.querySelector('.faq-children');
-					// Only toggle if child container exists.
 					if ( childContainer ) {
-						// Toggle display.
 						childContainer.style.display = ( childContainer.style.display === 'none' || childContainer.style.display === '' ) ? 'block' : 'none';
-						// Toggle chevron direction.
 						var chevron = this.querySelector('.chevron');
 						if ( chevron ) {
 							if ( childContainer.style.display === 'block' ) {
@@ -288,15 +280,12 @@ function display_faq_list_hierarchy_ajax( $atts ) {
 			document.querySelectorAll('.faq-guide-link').forEach(function(link) {
 				link.addEventListener('click', function(e) {
 					e.preventDefault();
-					// data-guide-slug now contains the guide identifier.
 					var guideIdentifier = this.getAttribute('data-guide-slug');
 					loadGuideContent(guideIdentifier);
 					document.querySelectorAll('.faq-guide-link').forEach(function(l) { l.classList.remove('active'); });
 					this.classList.add('active');
-					// Update the URL using the base URL from the component's data attribute.
 					var baseUrl = document.querySelector('.faq-component').getAttribute('data-baseurl');
 					history.pushState(null, '', baseUrl + guideIdentifier);
-					// Scroll to the top of the FAQ component, offset by 20px.
 					var faqComponent = document.querySelector('.faq-component');
 					var offset = faqComponent.getBoundingClientRect().top + window.pageYOffset - 120;
 					window.scrollTo({ top: offset, behavior: 'smooth' });
@@ -338,8 +327,6 @@ function display_faq_list_hierarchy_ajax( $atts ) {
 			window.filterFAQ = function(){
 				var input = document.getElementById('faq-search');
 				var filter = input.value.toLowerCase();
-
-				// If no search term, reset everything to default
 				if(filter === ''){
 					document.querySelectorAll('.faq-sidebar-item').forEach(function(item){
 						item.style.display = '';
@@ -347,31 +334,24 @@ function display_faq_list_hierarchy_ajax( $atts ) {
 					document.querySelectorAll('.faq-children').forEach(function(child){
 						child.style.display = 'none';
 					});
-					// Reset chevron direction.
 					document.querySelectorAll('.faq-term-header .chevron').forEach(function(chevron){
 						chevron.classList.remove('expanded');
 					});
 					return;
 				}
-
-				// First, hide all FAQ sidebar items and guide items
 				document.querySelectorAll('.faq-sidebar-item').forEach(function(item){
 					item.style.display = 'none';
 				});
 				document.querySelectorAll('.faq-guide-item').forEach(function(guideItem){
 					guideItem.style.display = 'none';
 				});
-
-				// Check each guide link for a match against the search term.
 				var allGuideLinks = document.querySelectorAll('.faq-guide-link');
 				allGuideLinks.forEach(function(guideLink) {
 					if( guideLink.textContent.toLowerCase().indexOf(filter) !== -1 ) {
-						// Show the guide's list item.
 						var guideItem = guideLink.closest('.faq-guide-item');
 						if(guideItem){
 							guideItem.style.display = '';
 						}
-						// Ensure that the parent term and any ancestors are shown and expanded.
 						var parentItem = guideLink.closest('.faq-sidebar-item');
 						while(parentItem) {
 							parentItem.style.display = '';
@@ -387,8 +367,6 @@ function display_faq_list_hierarchy_ajax( $atts ) {
 						}
 					}
 				});
-
-				// Also check category headers in case the term name matches.
 				document.querySelectorAll('.faq-term-header').forEach(function(header){
 					if(header.textContent.toLowerCase().indexOf(filter) !== -1) {
 						var parentItem = header.closest('.faq-sidebar-item');
@@ -425,8 +403,8 @@ function display_faq_list_hierarchy_ajax( $atts ) {
 							}
 							parent = parent.parentElement.closest('.faq-sidebar-item');
 						}
-						loadGuideContent("<?php echo esc_js( $active_guide_slug ); ?>");
 					}
+					loadGuideContent("<?php echo esc_js( $active_guide_slug ); ?>");
 				});
 			<?php endif; ?>
 		})();
@@ -455,7 +433,7 @@ function build_faq_sidebar_ajax( $parent_id, $taxonomy, $atts, $level = 0 ) {
 		$has_children = ( $children || $guides ) ? true : false;
 		$output .= '<li class="faq-sidebar-item" data-term-id="' . esc_attr( $term->term_id ) . '">';
 		if ( $has_children ) {
-			$output .= '<a href="#" class="faq-term-header"><span class="term-title">' . esc_html( $term->name ) . '</span><span class="chevron">▶</span></a>';
+			$output .= '<a href="#" class="faq-term-header"><i class="fa fa-chevron-right chevron"></i><span class="term-title">' . esc_html( $term->name ) . '</span></a>';
 		} else {
 			$output .= '<a href="#" class="faq-term-header"><span class="term-title">' . esc_html( $term->name ) . '</span></a>';
 		}
@@ -509,13 +487,10 @@ function build_guides_list_ajax( $term_id, $atts ) {
 	$output = '';
 	while ( $query->have_posts() ) {
 		$query->the_post();
-		// Retrieve the guide's identifier from its meta field "external_article_id".
-		// If not set, fall back to the guide’s post name.
 		$guide_identifier = get_post_meta( get_the_ID(), 'external_article_id', true );
 		if ( empty( $guide_identifier ) ) {
 			$guide_identifier = get_post_field( 'post_name', get_the_ID() );
 		}
-		// Build the guide URL based on the current page's permalink and the identifier.
 		$guide_url = trailingslashit( get_permalink() ) . $guide_identifier;
 		$output   .= '<li class="faq-guide-item">';
 		$output   .= '<a href="' . esc_url( $guide_url ) . '" class="faq-guide-link" data-guide-slug="' . esc_attr( $guide_identifier ) . '">' . get_the_title() . '</a>';
