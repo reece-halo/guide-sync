@@ -122,6 +122,9 @@ function display_faq_list_hierarchy_ajax( $atts ) {
 	ob_start();
 	?>
 	<style>
+	body {
+	    overflow-x: unset;
+	}
 	.faq-component {
 		display: flex;
 		align-items: flex-start;
@@ -137,7 +140,7 @@ function display_faq_list_hierarchy_ajax( $atts ) {
 		padding: 20px;
 		overflow-y: auto;
 		position: sticky;
-		top: 20px;
+		top: 100px;
 		height: fit-content;
 		align-self: flex-start;
 	}
