@@ -128,22 +128,31 @@ function display_faq_list_hierarchy_ajax( $atts ) {
 	.faq-component {
 		display: flex;
 		align-items: flex-start;
-		max-width: 1200px;
+		max-width: 1360px;
 		margin: 30px auto;
 		font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
 		background: #fff;
 		color: black;
 		position: relative;
 	}
+	/*.faq-sidebar {*/
+	/*	flex: 0 0 300px;*/
+	/*	padding: 20px;*/
+	/*	overflow-y: auto;*/
+	/*	position: sticky;*/
+	/*	top: 100px;*/
+	/*	height: fit-content;*/
+	/*	align-self: flex-start;*/
+	/*}*/
 	.faq-sidebar {
-		flex: 0 0 300px;
-		padding: 20px;
-		overflow-y: auto;
-		position: sticky;
-		top: 100px;
-		height: fit-content;
-		align-self: flex-start;
-	}
+        flex: 0 0 300px;
+        padding: 20px;
+        overflow-y: auto;
+        position: sticky;
+        top: 100px;
+        max-height: calc(100vh - 100px);
+        align-self: flex-start;
+    }
 	/* Base Article Container */
     .faq-main {
       flex: 1;
@@ -269,6 +278,10 @@ function display_faq_list_hierarchy_ajax( $atts ) {
 			width: 100%;
 			border-right: none;
 			border-bottom: 1px solid #e0e0e0;
+			position: static;
+            top: auto;
+            max-height: 25vh;
+            overflow-y: scroll;
 		}
 	}
 	</style>
