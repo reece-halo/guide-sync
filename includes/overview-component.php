@@ -88,12 +88,9 @@ function faq_load_guide_content() {
 /**
  * Shortcode: [faq_list_hierarchy_ajax]
  *
- * Outputs a two-column layout:
- *  - Left sidebar: a nested, collapsible FAQ hierarchy.
- *  - Right area: guide content loaded via AJAX.
- *
- * Deep linking is supported on product pages so that when a guide is selected
- * the URL becomes /{product}/guides/{guide_identifier} (where guide_identifier is ideally the meta "external_article_id").
+ * Outputs a two-column layout with the FAQ hierarchy.
+ * If you specify an additional FAQ list via the "additional_root" attribute,
+ * it will be forced to display as a child of the specified "root" FAQ list.
  */
 function display_faq_list_hierarchy_ajax( $atts ) {
 	$atts = shortcode_atts( array(
@@ -101,7 +98,8 @@ function display_faq_list_hierarchy_ajax( $atts ) {
 		'posts_per_term'  => -1,         // Number of guides per term (-1 for all).
 		'orderby'         => 'title',    // Ordering for guides.
 		'order'           => 'ASC',
-		'root'            => '',         // Optional: specify a root FAQ list via its halo_id.
+		'root'            => '',         // Specify a root FAQ list via its halo_id.
+		'additional_root' => '',         // Specify an additional FAQ list via its halo_id.
 	), $atts, 'faq_list_hierarchy_ajax' );
 
 	$taxonomy = sanitize_text_field( $atts['taxonomy'] );
@@ -115,7 +113,50 @@ function display_faq_list_hierarchy_ajax( $atts ) {
 	$parent_id = ( $root_term ) ? $root_term->term_id : 0;
 	$sidebar   = build_faq_sidebar_ajax( $parent_id, $taxonomy, $atts );
 	$active_guide_slug = get_query_var( 'faq_guide', '' );
-	
+
+	// If an additional FAQ list is provided, inject it as a child of the root.
+	if ( $root_term && ! empty( $atts['additional_root'] ) ) {
+		$additional_term = get_faq_term_by_halo_id( sanitize_text_field( $atts['additional_root'] ), $taxonomy );
+		if ( $additional_term ) {
+			// Build the additional term's list item.
+			$additional_item = '';
+			$children = build_faq_sidebar_ajax( $additional_term->term_id, $taxonomy, $atts, 1 );
+			$guides   = build_guides_list_ajax( $additional_term->term_id, $atts );
+			$has_children = ( $children || $guides ) ? true : false;
+			$additional_item .= '<li class="faq-sidebar-item" data-term-id="' . esc_attr( $additional_term->term_id ) . '">';
+			if ( $has_children ) {
+				$additional_item .= '<a href="#" class="faq-term-header"><i class="fa fa-chevron-right chevron"></i><span class="term-title">' . esc_html( $additional_term->name ) . '</span></a>';
+			} else {
+				$additional_item .= '<a href="#" class="faq-term-header"><span class="term-title">' . esc_html( $additional_term->name ) . '</span></a>';
+			}
+			if ( $has_children ) {
+				$additional_item .= '<div class="faq-children" style="display:none;">';
+				if ( $children ) {
+					$additional_item .= $children;
+				}
+				if ( $guides ) {
+					$additional_item .= '<ul class="faq-guides-list">' . $guides . '</ul>';
+				}
+				$additional_item .= '</div>';
+			}
+			$additional_item .= '</li>';
+
+			// Append the additional term as a child of the root.
+			if ( empty( $sidebar ) ) {
+				// No existing children? Create a new list.
+				$sidebar = '<ul class="faq-sidebar-list level-1">' . $additional_item . '</ul>';
+			} else {
+				// Insert before the closing </ul> tag.
+				$closing_ul = '</ul>';
+				if ( substr( $sidebar, -strlen( $closing_ul ) ) === $closing_ul ) {
+					$sidebar = substr( $sidebar, 0, -strlen( $closing_ul ) ) . $additional_item . $closing_ul;
+				} else {
+					$sidebar .= $additional_item;
+				}
+			}
+		}
+	}
+
 	// Get the current page URL (should be the productX/guides page).
 	$current_permalink = trailingslashit( get_permalink() );
 	
@@ -135,15 +176,6 @@ function display_faq_list_hierarchy_ajax( $atts ) {
 		color: black;
 		position: relative;
 	}
-	/*.faq-sidebar {*/
-	/*	flex: 0 0 300px;*/
-	/*	padding: 20px;*/
-	/*	overflow-y: auto;*/
-	/*	position: sticky;*/
-	/*	top: 100px;*/
-	/*	height: fit-content;*/
-	/*	align-self: flex-start;*/
-	/*}*/
 	.faq-sidebar {
         flex: 0 0 300px;
         padding: 20px;
@@ -153,47 +185,35 @@ function display_faq_list_hierarchy_ajax( $atts ) {
         max-height: calc(100vh - 100px);
         align-self: flex-start;
     }
-	/* Base Article Container */
-    .faq-main {
+	.faq-main {
       flex: 1;
       padding: 30px;
       background: #fff;
-      /* border-left: 1px solid #e0e0e0; */
     }
-    
-    /* Headings */
-    .faq-main h1 {
+	.faq-main h1 {
       font-size: 2rem;
       margin: 0 0 10px;
       border-bottom: 1px solid #e0e0e0;
       padding-bottom: 15px;
     }
-    
-    /* Secondary Headings */
-    .faq-main h2,
-    .faq-main h3,
-    .faq-main h4,
-    .faq-main h5,
-    .faq-main h6 {
+	.faq-main h2,
+	.faq-main h3,
+	.faq-main h4,
+	.faq-main h5,
+	.faq-main h6 {
       margin-top: 20px;
       margin-bottom: 10px;
     }
-    
-    /* Paragraphs */
-    .faq-main p {
+	.faq-main p {
       margin: 1em 0;
       line-height: 1.6;
     }
-    
-    /* Lists (Ordered & Unordered) */
-    .faq-main ul,
-    .faq-main ol {
+	.faq-main ul,
+	.faq-main ol {
       margin: 1em 0;
       padding-left: 20px;
     }
-    
-    /* Images */
-    .faq-main img {
+	.faq-main img {
       max-width: 100%;
       height: auto;
       object-fit: contain;
@@ -270,6 +290,11 @@ function display_faq_list_hierarchy_ajax( $atts ) {
 		background: #0073aa;
 		color: white !important;
 	}
+	
+	.styled-table td {
+	    color: black;
+	}
+	
 	@media (max-width: 768px) {
 		.faq-component {
 			flex-direction: column;
@@ -381,17 +406,40 @@ function display_faq_list_hierarchy_ajax( $atts ) {
 				var input = document.getElementById('faq-search');
 				var filter = input.value.toLowerCase();
 				if(filter === ''){
+					// Reset all sidebar items and guide items.
 					document.querySelectorAll('.faq-sidebar-item').forEach(function(item){
 						item.style.display = '';
 					});
+					document.querySelectorAll('.faq-guide-item').forEach(function(item){
+						item.style.display = '';
+					});
+					// Collapse all children.
 					document.querySelectorAll('.faq-children').forEach(function(child){
 						child.style.display = 'none';
 					});
 					document.querySelectorAll('.faq-term-header .chevron').forEach(function(chevron){
 						chevron.classList.remove('expanded');
 					});
+					
+					// Re-open the parent containers for the active guide, if any.
+					var activeLink = document.querySelector('.faq-guide-link.active');
+					if(activeLink){
+						var parentItem = activeLink.closest('.faq-sidebar-item');
+						while(parentItem) {
+							var childrenContainer = parentItem.querySelector('.faq-children');
+							if(childrenContainer){
+								childrenContainer.style.display = 'block';
+								var chevron = parentItem.querySelector('.faq-term-header .chevron');
+								if(chevron){
+									chevron.classList.add('expanded');
+								}
+							}
+							parentItem = parentItem.parentElement.closest('.faq-sidebar-item');
+						}
+					}
 					return;
 				}
+				// If a filter is applied, hide everything first.
 				document.querySelectorAll('.faq-sidebar-item').forEach(function(item){
 					item.style.display = 'none';
 				});
