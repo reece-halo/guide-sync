@@ -36,7 +36,7 @@ function faq_register_rewrite_rules() {
 add_action( 'template_redirect', 'faq_redirect_guides_to_halopsa' );
 function faq_redirect_guides_to_halopsa() {
 	if ( get_query_var( 'guides_redirect' ) === '1' ) {
-		wp_redirect( home_url( '/halopsa/guides' ), 301 );
+		wp_redirect( home_url( '/' ), 301 );
 		exit;
 	}
 }
@@ -171,7 +171,6 @@ function display_faq_list_hierarchy_ajax( $atts ) {
 		align-items: flex-start;
 		max-width: 1360px;
 		margin: 30px auto;
-		font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
 		background: #fff;
 		color: black;
 		position: relative;
@@ -236,18 +235,18 @@ function display_faq_list_hierarchy_ajax( $atts ) {
 		margin: 0;
 	}
 	.faq-sidebar-list li {
-		margin-bottom: 10px;
+		margin-bottom: 5px;
 	}
 	.faq-term-header {
 		display: flex;
 		align-items: center;
 		justify-content: flex-start;
-		padding: 12px 15px;
+		padding: 8px 10px;
 		background: #ffffff;
 		border-radius: 8px;
 		color: #000 !important;
 		text-decoration: none;
-		font-size: 16px;
+		font-size: 15px;
 		transition: background 0.3s ease, transform 0.2s ease;
 		box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
 		cursor: pointer;
@@ -261,10 +260,10 @@ function display_faq_list_hierarchy_ajax( $atts ) {
 		transform: rotate(90deg);
 	}
 	.faq-children {
-		margin-left: 20px;
-		margin-top: 8px;
-		padding-left: 10px;
-		border-left: 2px solid #ddd;
+		margin-left: 10px;
+		margin-top: 4px;
+		padding-left: 5px;
+		border-left: 1px solid #ddd;
 	}
 	.faq-guides-list {
 		list-style: none;
@@ -273,12 +272,12 @@ function display_faq_list_hierarchy_ajax( $atts ) {
 	}
 	.faq-guide-link {
 		display: block;
-		padding: 10px 12px;
+		padding: 8px 10px;
 		background: #fff;
 		border-radius: 8px;
 		color: #000 !important;
 		text-decoration: none;
-		font-size: 15px;
+		font-size: 14px;
 		transition: background 0.3s ease, color 0.3s ease, transform 0.2s ease;
 		box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
 	}
