@@ -14,9 +14,6 @@ add_action( 'wp_enqueue_scripts', 'faq_enqueue_fontawesome' );
 
 /**
  * Register rewrite rules.
- * 
- * - The first rule catches URLs like /guides and sets a query var so we can redirect to /halopsa/guides.
- * - The second rule handles guide URLs in the format /{product}/guides/{guide_identifier}.
  */
 add_action( 'init', 'faq_register_rewrite_rules' );
 function faq_register_rewrite_rules() {
@@ -43,9 +40,6 @@ function faq_redirect_guides_to_halopsa() {
 
 /**
  * AJAX handler for loading a guide’s content.
- *
- * This function first attempts to load the guide using its meta field "external_article_id".
- * If no guide is found by meta, it falls back to looking it up by its post name.
  */
 add_action( 'wp_ajax_load_guide_content', 'faq_load_guide_content' );
 add_action( 'wp_ajax_nopriv_load_guide_content', 'faq_load_guide_content' );
@@ -86,11 +80,49 @@ function faq_load_guide_content() {
 }
 
 /**
+ * AJAX handler for server-side searching of guides by full content.
+ */
+add_action( 'wp_ajax_faq_search_guides', 'faq_search_guides' );
+add_action( 'wp_ajax_nopriv_faq_search_guides', 'faq_search_guides' );
+function faq_search_guides() {
+	$search_query = isset( $_POST['search_term'] ) ? sanitize_text_field( $_POST['search_term'] ) : '';
+	if ( empty( $search_query ) ) {
+		wp_send_json_error( 'No search term provided.' );
+	}
+	
+	$args = array(
+		'post_type'      => 'guide',
+		'posts_per_page' => -1,
+		's'              => $search_query,
+	);
+	
+	$query = new WP_Query( $args );
+	
+	$results = array();
+	if ( $query->have_posts() ) {
+		while ( $query->have_posts() ) {
+			$query->the_post();
+			$guide_identifier = get_post_meta( get_the_ID(), 'external_article_id', true );
+			if ( empty( $guide_identifier ) ) {
+				$guide_identifier = get_post_field( 'post_name', get_the_ID() );
+			}
+			$results[] = array(
+				'title'      => get_the_title(),
+				'excerpt'    => get_the_excerpt(),
+				'permalink'  => trailingslashit( get_permalink() ) . $guide_identifier,
+				'guide_slug' => $guide_identifier,
+			);
+		}
+		wp_reset_postdata();
+	}
+	
+	wp_send_json_success( $results );
+}
+
+/**
  * Shortcode: [faq_list_hierarchy_ajax]
  *
  * Outputs a two-column layout with the FAQ hierarchy.
- * If you specify an additional FAQ list via the "additional_root" attribute,
- * it will be forced to display as a child of the specified "root" FAQ list.
  */
 function display_faq_list_hierarchy_ajax( $atts ) {
 	$atts = shortcode_atts( array(
@@ -157,7 +189,7 @@ function display_faq_list_hierarchy_ajax( $atts ) {
 		}
 	}
 
-	// Get the current page URL (should be the productX/guides page).
+	// Get the current page URL.
 	$current_permalink = trailingslashit( get_permalink() );
 	
 	ob_start();
@@ -220,14 +252,50 @@ function display_faq_list_hierarchy_ajax( $atts ) {
     }
 	.faq-search-container {
 		margin-bottom: 15px;
+		position: relative;
 	}
+	/* Extra right padding so buttons remain outside the text area */
 	#faq-search {
 		width: 100%;
 		padding: 10px 15px;
+		padding-right: 70px;
 		border: none;
 		border-radius: 25px;
 		box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.1);
 		font-size: 16px;
+	}
+	/* Search button styling */
+	#faq-search-button {
+	    padding: 2px;
+		background: none;
+		border: none;
+		cursor: pointer;
+		font-size: 18px;
+		color: black;
+	}
+	/* Clear button styling */
+	#faq-clear-button {
+	    padding: 2px;
+		background: none;
+		border: none;
+		cursor: pointer;
+		font-size: 18px;
+		display: none;
+		color: black;
+	}
+	.search-button-container {
+	    position: absolute;
+	    right: 10px;
+	    top: 50%;
+	    transform: translateY(-50%);
+	    display: flex;
+	    align-items: center;
+	    justify-content: right;
+	    gap: 6px;
+	}
+	/* New container for the FAQ list only */
+	#faq-sidebar-list-container {
+		margin-top: 20px;
 	}
 	.faq-sidebar-list {
 		list-style: none;
@@ -314,9 +382,15 @@ function display_faq_list_hierarchy_ajax( $atts ) {
 	<div class="faq-component" data-baseurl="<?php echo esc_url( $current_permalink ); ?>">
 		<div class="faq-sidebar">
 			<div class="faq-search-container">
-				<input type="text" id="faq-search" placeholder="Search FAQs or guides..." onkeyup="filterFAQ()">
+				<input type="text" id="faq-search" placeholder="Search guides...">
+				<div class="search-button-container">
+				    <button id="faq-clear-button" type="button"><i class="fa fa-times"></i></button>
+    				<button id="faq-search-button" type="button"><i class="fa fa-arrow-right"></i></button>
+    			</div>
 			</div>
-			<?php echo $sidebar; ?>
+			<div id="faq-sidebar-list-container">
+				<?php echo $sidebar; ?>
+			</div>
 		</div>
 		<div class="faq-main">
 			<div id="faq-guide-content">
@@ -333,43 +407,80 @@ function display_faq_list_hierarchy_ajax( $atts ) {
 
 	<script>
 		(function(){
-			// Toggle FAQ term expansion.
-			document.querySelectorAll('.faq-term-header').forEach(function(header) {
-				header.addEventListener('click', function(e) {
+			// Store the original FAQ list markup for reverting after search.
+			var sidebarListContainer = document.getElementById('faq-sidebar-list-container');
+			var originalSidebar = sidebarListContainer.innerHTML;
+			
+			var searchInput = document.getElementById('faq-search');
+			var clearButton = document.getElementById('faq-clear-button');
+
+			// If the search input is inside a form, prevent form submission.
+			var parentForm = searchInput.closest('form');
+			if (parentForm) {
+				parentForm.addEventListener('submit', function(e) {
 					e.preventDefault();
-					var parentItem = this.parentElement;
-					var childContainer = parentItem.querySelector('.faq-children');
-					if ( childContainer ) {
-						childContainer.style.display = ( childContainer.style.display === 'none' || childContainer.style.display === '' ) ? 'block' : 'none';
-						var chevron = this.querySelector('.chevron');
-						if ( chevron ) {
-							if ( childContainer.style.display === 'block' ) {
-								chevron.classList.add('expanded');
-							} else {
-								chevron.classList.remove('expanded');
-							}
-						}
-					}
+					return false;
 				});
+			}
+
+			// Toggle the clear button's visibility based on input content.
+			searchInput.addEventListener('input', function(e) {
+				if(e.target.value.trim() !== '') {
+					clearButton.style.display = 'block';
+				} else {
+					clearButton.style.display = 'none';
+					sidebarListContainer.innerHTML = originalSidebar;
+				}
 			});
 
-			// Guide link click: load guide content via Ajax.
-			document.querySelectorAll('.faq-guide-link').forEach(function(link) {
-				link.addEventListener('click', function(e) {
+			// Clear search input and restore the original FAQ list.
+			clearButton.addEventListener('click', function() {
+				searchInput.value = '';
+				clearButton.style.display = 'none';
+				sidebarListContainer.innerHTML = originalSidebar;
+			});
+
+			// Delegated event for toggling FAQ term expansion/collapse.
+			document.addEventListener('click', function(e) {
+				var header = e.target.closest('.faq-term-header');
+				if (header && header.parentElement && header.parentElement.classList.contains('faq-sidebar-item')) {
 					e.preventDefault();
-					var guideIdentifier = this.getAttribute('data-guide-slug');
+					var parentItem = header.parentElement;
+					var childrenContainer = parentItem.querySelector('.faq-children');
+					if (childrenContainer) {
+						if (childrenContainer.style.display === 'none' || childrenContainer.style.display === '') {
+							childrenContainer.style.display = 'block';
+							var chevron = header.querySelector('.chevron');
+							if(chevron) { chevron.classList.add('expanded'); }
+						} else {
+							childrenContainer.style.display = 'none';
+							var chevron = header.querySelector('.chevron');
+							if(chevron) { chevron.classList.remove('expanded'); }
+						}
+					}
+				}
+			});
+
+			// Attach click event to guide links (using event delegation).
+			document.addEventListener('click', function(e) {
+				if(e.target && e.target.classList.contains('faq-guide-link')) {
+					e.preventDefault();
+					var guideIdentifier = e.target.getAttribute('data-guide-slug');
 					loadGuideContent(guideIdentifier);
-					document.querySelectorAll('.faq-guide-link').forEach(function(l) { l.classList.remove('active'); });
-					this.classList.add('active');
+					// Update active class.
+					document.querySelectorAll('.faq-guide-link').forEach(function(link) {
+						link.classList.remove('active');
+					});
+					e.target.classList.add('active');
 					var baseUrl = document.querySelector('.faq-component').getAttribute('data-baseurl');
 					history.pushState(null, '', baseUrl + guideIdentifier);
 					var faqComponent = document.querySelector('.faq-component');
 					var offset = faqComponent.getBoundingClientRect().top + window.pageYOffset - 120;
 					window.scrollTo({ top: offset, behavior: 'smooth' });
-				});
+				}
 			});
 
-			// Ajax function to load guide content.
+			// Function to load guide content via Ajax.
 			function loadGuideContent( guideIdentifier ) {
 				var contentDiv = document.getElementById('faq-guide-content');
 				contentDiv.innerHTML = '<p>Loading guide content...</p>';
@@ -396,94 +507,92 @@ function display_faq_list_hierarchy_ajax( $atts ) {
 				xhr.send( data );
 			}
 
-			/**
-			 * Filter the entire FAQ sidebar based on the search term.
-			 * When a guide title or a category name matches, that guide (and its parents)
-			 * become visible.
-			 */
-			window.filterFAQ = function(){
-				var input = document.getElementById('faq-search');
-				var filter = input.value.toLowerCase();
-				if(filter === ''){
-					// Reset all sidebar items and guide items.
-					document.querySelectorAll('.faq-sidebar-item').forEach(function(item){
-						item.style.display = '';
-					});
-					document.querySelectorAll('.faq-guide-item').forEach(function(item){
-						item.style.display = '';
-					});
-					// Collapse all children.
-					document.querySelectorAll('.faq-children').forEach(function(child){
-						child.style.display = 'none';
-					});
-					document.querySelectorAll('.faq-term-header .chevron').forEach(function(chevron){
-						chevron.classList.remove('expanded');
-					});
-					
-					// Re-open the parent containers for the active guide, if any.
-					var activeLink = document.querySelector('.faq-guide-link.active');
-					if(activeLink){
-						var parentItem = activeLink.closest('.faq-sidebar-item');
-						while(parentItem) {
-							var childrenContainer = parentItem.querySelector('.faq-children');
-							if(childrenContainer){
-								childrenContainer.style.display = 'block';
-								var chevron = parentItem.querySelector('.faq-term-header .chevron');
-								if(chevron){
-									chevron.classList.add('expanded');
-								}
-							}
-							parentItem = parentItem.parentElement.closest('.faq-sidebar-item');
+			// Function to filter the FAQ list based on matching guide slugs.
+			function filterSidebarByResults(matchingSlugs) {
+				// Reset FAQ list to original markup.
+				sidebarListContainer.innerHTML = originalSidebar;
+				// For each guide link in the FAQ list:
+				var guideLinks = sidebarListContainer.querySelectorAll('.faq-guide-link');
+				guideLinks.forEach(function(link) {
+					var slug = link.getAttribute('data-guide-slug');
+					if ( matchingSlugs.indexOf(slug) === -1 ) {
+						var guideItem = link.closest('.faq-guide-item');
+						if (guideItem) {
+							guideItem.style.display = 'none';
 						}
 					}
-					return;
+				});
+				// Iterate over FAQ sidebar items to hide those without visible matching guides.
+				var faqItems = sidebarListContainer.querySelectorAll('.faq-sidebar-item');
+				var faqItemsArray = Array.from(faqItems).reverse();
+				faqItemsArray.forEach(function(item) {
+					var visibleGuide = item.querySelector('.faq-guide-item:not([style*="display: none"])');
+					if (!visibleGuide) {
+						item.style.display = 'none';
+					} else {
+						// Expand the item to show its children.
+						var childrenContainer = item.querySelector('.faq-children');
+						if (childrenContainer) {
+							childrenContainer.style.display = 'block';
+							var chevron = item.querySelector('.faq-term-header .chevron');
+							if (chevron) {
+								chevron.classList.add('expanded');
+							}
+						}
+					}
+				});
+			}
+
+			// Server-side search function.
+			function searchGuides(query) {
+				var xhr = new XMLHttpRequest();
+				xhr.open('POST', '<?php echo admin_url('admin-ajax.php'); ?>', true);
+				xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded; charset=UTF-8');
+				xhr.onload = function(){
+					if(xhr.status === 200) {
+						try {
+							var response = JSON.parse(xhr.responseText);
+							if(response.success) {
+								var matchingSlugs = response.data.map(function(item) {
+									return item.guide_slug;
+								});
+								filterSidebarByResults(matchingSlugs);
+							} else {
+								console.error('Search error:', response.data);
+							}
+						} catch(e) {
+							console.error('Error parsing search response');
+						}
+					} else {
+						console.error('Error in AJAX request');
+					}
+				};
+				xhr.send('action=faq_search_guides&search_term=' + encodeURIComponent(query));
+			}
+
+			// Event listener for search input to trigger search on Enter key.
+			searchInput.addEventListener('keydown', function(e) {
+				if (e.key === 'Enter') {
+					e.preventDefault();
+					e.stopPropagation();
+					var query = e.target.value.trim();
+					if(query === '') {
+						sidebarListContainer.innerHTML = originalSidebar;
+					} else {
+						searchGuides(query);
+					}
 				}
-				// If a filter is applied, hide everything first.
-				document.querySelectorAll('.faq-sidebar-item').forEach(function(item){
-					item.style.display = 'none';
-				});
-				document.querySelectorAll('.faq-guide-item').forEach(function(guideItem){
-					guideItem.style.display = 'none';
-				});
-				var allGuideLinks = document.querySelectorAll('.faq-guide-link');
-				allGuideLinks.forEach(function(guideLink) {
-					if( guideLink.textContent.toLowerCase().indexOf(filter) !== -1 ) {
-						var guideItem = guideLink.closest('.faq-guide-item');
-						if(guideItem){
-							guideItem.style.display = '';
-						}
-						var parentItem = guideLink.closest('.faq-sidebar-item');
-						while(parentItem) {
-							parentItem.style.display = '';
-							var childrenContainer = parentItem.querySelector('.faq-children');
-							if(childrenContainer) {
-								childrenContainer.style.display = 'block';
-								var chevron = parentItem.querySelector('.faq-term-header .chevron');
-								if(chevron){
-									chevron.classList.add('expanded');
-								}
-							}
-							parentItem = parentItem.parentElement.closest('.faq-sidebar-item');
-						}
-					}
-				});
-				document.querySelectorAll('.faq-term-header').forEach(function(header){
-					if(header.textContent.toLowerCase().indexOf(filter) !== -1) {
-						var parentItem = header.closest('.faq-sidebar-item');
-						if(parentItem) {
-							parentItem.style.display = '';
-							var childrenContainer = parentItem.querySelector('.faq-children');
-							if(childrenContainer) {
-								childrenContainer.style.display = 'block';
-								var chevron = header.querySelector('.chevron');
-								if(chevron){
-									chevron.classList.add('expanded');
-								}
-							}
-						}
-					}
-				});
-			};
+			});
+
+			// Event listener for search button click.
+			document.getElementById('faq-search-button').addEventListener('click', function() {
+				var query = searchInput.value.trim();
+				if(query === '') {
+					sidebarListContainer.innerHTML = originalSidebar;
+				} else {
+					searchGuides(query);
+				}
+			});
 
 			// On page load: if a guide is specified in the URL, load its content and expand parent items.
 			<?php if ( ! empty( $active_guide_slug ) ) : ?>
@@ -555,10 +664,6 @@ function build_faq_sidebar_ajax( $parent_id, $taxonomy, $atts, $level = 0 ) {
 
 /**
  * Build a list of guides for a specific FAQ term.
- *
- * This function uses the guide’s meta field "external_article_id" (if set)
- * to build the deep link URL. If "external_article_id" is not present, it falls back
- * to using the guide’s post name.
  */
 function build_guides_list_ajax( $term_id, $atts ) {
 	$taxonomy       = sanitize_text_field( $atts['taxonomy'] );
