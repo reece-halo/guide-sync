@@ -93,7 +93,7 @@ function faq_search_guides() {
 	$args = array(
 		'post_type'      => 'guide',
 		'posts_per_page' => -1,
-		's'              => $search_query,
+		's'              => '"' . $search_query . '"',
 	);
 	
 	$query = new WP_Query( $args );
