@@ -93,7 +93,7 @@ function faq_search_guides() {
 	$args = array(
 		'post_type'      => 'guide',
 		'posts_per_page' => -1,
-		's'              => '" ' . $search_query . '"',
+		's'              => '" ' . $search_query . ' "',
 	);
 	
 	$query = new WP_Query( $args );
@@ -362,6 +362,10 @@ function display_faq_list_hierarchy_ajax( $atts ) {
 	    color: black;
 	}
 	
+	[id] {
+        scroll-margin-top: 110px;
+    }
+	
 	@media (max-width: 768px) {
 		.faq-component {
 			flex-direction: column;
@@ -482,30 +486,45 @@ function display_faq_list_hierarchy_ajax( $atts ) {
 
 			// Function to load guide content via Ajax.
 			function loadGuideContent( guideIdentifier ) {
-				var contentDiv = document.getElementById('faq-guide-content');
-				contentDiv.innerHTML = '<p>Loading guide content...</p>';
-				var data = 'action=load_guide_content&guide_slug=' + encodeURIComponent( guideIdentifier );
-				var xhr = new XMLHttpRequest();
-				xhr.open('POST', '<?php echo admin_url('admin-ajax.php'); ?>', true);
-				xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded; charset=UTF-8');
-				xhr.onload = function(){
-					if ( xhr.status === 200 ) {
-						try {
-							var response = JSON.parse( xhr.responseText );
-							if ( response.success ) {
-								contentDiv.innerHTML = '<h2>' + response.data.title + '</h2>' + response.data.content;
-							} else {
-								contentDiv.innerHTML = '<p>Error: ' + response.data + '</p>';
-							}
-						} catch( e ) {
-							contentDiv.innerHTML = '<p>Error parsing response.</p>';
-						}
-					} else {
-						contentDiv.innerHTML = '<p>Error loading guide content.</p>';
-					}
-				};
-				xhr.send( data );
-			}
+                var contentDiv = document.getElementById('faq-guide-content');
+                contentDiv.innerHTML = '<p>Loading guide content...</p>';
+                var data = 'action=load_guide_content&guide_slug=' + encodeURIComponent( guideIdentifier );
+                var xhr = new XMLHttpRequest();
+                xhr.open('POST', '<?php echo admin_url('admin-ajax.php'); ?>', true);
+                xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded; charset=UTF-8');
+                xhr.onload = function(){
+                    if ( xhr.status === 200 ) {
+                        try {
+                            var response = JSON.parse( xhr.responseText );
+                            if ( response.success ) {
+                                contentDiv.innerHTML = '<h2>' + response.data.title + '</h2>' + response.data.content;
+                                // After content loads, check if there is a hash in the URL and scroll to that element.
+                                if (window.location.hash) {
+                                    setTimeout(function(){
+                                        var targetId = window.location.hash.substring(1);
+                                        var targetElem = document.getElementById(targetId);
+                                        if (targetElem) {
+                                            // Set the header height offset (adjust as needed)
+                                            var headerOffset = 120;
+                                            var elementPosition = targetElem.getBoundingClientRect().top;
+                                            var offsetPosition = elementPosition + window.pageYOffset - headerOffset;
+                                            window.scrollTo({ top: offsetPosition, behavior: 'smooth' });
+                                        }
+                                    }, 100); // adjust delay if necessary
+                                }
+                            } else {
+                                contentDiv.innerHTML = '<p>Error: ' + response.data + '</p>';
+                            }
+                        } catch( e ) {
+                            contentDiv.innerHTML = '<p>Error parsing response.</p>';
+                        }
+                    } else {
+                        contentDiv.innerHTML = '<p>Error loading guide content.</p>';
+                    }
+                };
+                xhr.send( data );
+            }
+
 
 			// Function to filter the FAQ list based on matching guide slugs.
 			function filterSidebarByResults(matchingSlugs) {
