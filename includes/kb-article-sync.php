@@ -4,6 +4,18 @@ if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
+// Bypass HTML sanitization for 'guide' posts created during a cron job.
+function bypass_kses_for_cron( $data, $postarr ) {
+    // Check if we're running as part of a cron job and the post type is 'guide'
+    if ( defined( 'DOING_CRON' ) && DOING_CRON && isset( $data['post_type'] ) && 'guide' === $data['post_type'] ) {
+        // Remove the filters that sanitize post content and excerpt
+        remove_filter( 'content_save_pre', 'wp_filter_post_kses' );
+        remove_filter( 'excerpt_save_pre', 'wp_filter_post_kses' );
+    }
+    return $data;
+}
+add_filter( 'wp_insert_post_data', 'bypass_kses_for_cron', 10, 2 );
+
 // Sync guide articles
 function sync_guide_articles() {
     $api_url = 'https://halo.haloservicedesk.com/api/KBArticle?count=5000&type=0&isportal=true';
