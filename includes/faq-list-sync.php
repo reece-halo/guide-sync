@@ -24,14 +24,14 @@ function sync_faq_lists_from_api() {
 
     // Sync FAQ Lists
     foreach ($data as $faq_list) {
-        sync_faq_list($faq_list['id'], $faq_list['name'], $faq_list['group_id'], $data);
+        sync_faq_list($faq_list['id'], $faq_list['name'], $faq_list['group_id'], $faq_list['sequence'], $data);
     }
 }
 
 /**
  * Recursively syncs FAQ lists and ensures hierarchy is maintained.
  */
-function sync_faq_list($halo_id, $name, $group_id, $faq_data, $processed = []) {
+function sync_faq_list($halo_id, $name, $group_id, $sequence, $faq_data, $processed = []) {
     // Avoid infinite recursion if there are circular dependencies
     if (in_array($halo_id, $processed)) {
         return null;
@@ -62,6 +62,7 @@ function sync_faq_list($halo_id, $name, $group_id, $faq_data, $processed = []) {
         // Update existing term
         wp_update_term($existing_term, 'faq_list', ['name' => $name, 'parent' => $parent_id]);
         update_term_meta($existing_term, 'group_id', $group_id);
+        update_term_meta($existing_term, 'sequence', $sequence);
         return $existing_term;
     } else {
         // Insert new term
@@ -71,6 +72,7 @@ function sync_faq_list($halo_id, $name, $group_id, $faq_data, $processed = []) {
             $new_term_id = $new_term['term_id'];
             update_term_meta($new_term_id, 'halo_id', $halo_id);
             update_term_meta($new_term_id, 'group_id', $group_id);
+            update_term_meta($new_term_id, 'sequence', $sequence);
             return $new_term_id;
         } else {
             return null;

@@ -128,8 +128,6 @@ function display_faq_list_hierarchy_ajax( $atts ) {
 	$atts = shortcode_atts( array(
 		'taxonomy'        => 'faq_list', // Your FAQ taxonomy.
 		'posts_per_term'  => -1,         // Number of guides per term (-1 for all).
-		'orderby'         => 'title',    // Ordering for guides.
-		'order'           => 'ASC',
 		'root'            => '',         // Specify a root FAQ list via its halo_id.
 		'additional_root' => '',         // Specify an additional FAQ list via its halo_id.
 	), $atts, 'faq_list_hierarchy_ajax' );
@@ -142,54 +140,65 @@ function display_faq_list_hierarchy_ajax( $atts ) {
 			return '<p class="faq-error">Invalid root FAQ list halo_id provided.</p>';
 		}
 	}
+	// Determine the parent based on the root.
 	$parent_id = ( $root_term ) ? $root_term->term_id : 0;
-	$sidebar   = build_faq_sidebar_ajax( $parent_id, $taxonomy, $atts );
-	$active_guide_slug = get_query_var( 'faq_guide', '' );
 
-	// If an additional FAQ list is provided, inject it as a child of the root.
+	// Build the sidebar markup using children of the root.
+	$sidebar = build_faq_sidebar_ajax( $parent_id, $taxonomy, $atts );
+
+	// If an additional FAQ list is provided, merge it with the root's children and sort by sequence.
 	if ( $root_term && ! empty( $atts['additional_root'] ) ) {
 		$additional_term = get_faq_term_by_halo_id( sanitize_text_field( $atts['additional_root'] ), $taxonomy );
 		if ( $additional_term ) {
-			// Build the additional term's list item.
-			$additional_item = '';
-			$children = build_faq_sidebar_ajax( $additional_term->term_id, $taxonomy, $atts, 1 );
-			$guides   = build_guides_list_ajax( $additional_term->term_id, $atts );
-			$has_children = ( $children || $guides ) ? true : false;
-			$additional_item .= '<li class="faq-sidebar-item" data-term-id="' . esc_attr( $additional_term->term_id ) . '">';
-			if ( $has_children ) {
-				$additional_item .= '<a href="#" class="faq-term-header"><i class="fa fa-chevron-right chevron"></i><span class="term-title">' . esc_html( $additional_term->name ) . '</span></a>';
-			} else {
-				$additional_item .= '<a href="#" class="faq-term-header"><span class="term-title">' . esc_html( $additional_term->name ) . '</span></a>';
-			}
-			if ( $has_children ) {
-				$additional_item .= '<div class="faq-children" style="display:none;">';
-				if ( $children ) {
-					$additional_item .= $children;
+			// Get existing child terms of the root.
+			$child_terms = get_terms( array(
+				'taxonomy'   => $taxonomy,
+				'hide_empty' => true,
+				'parent'     => $root_term->term_id,
+			) );
+			// Add the additional term.
+			$child_terms[] = $additional_term;
+			// Sort terms by their "sequence" meta value (defaulting to 99999 if not set).
+			usort( $child_terms, function( $a, $b ) {
+				$a_seq = get_term_meta( $a->term_id, 'sequence', true );
+				$b_seq = get_term_meta( $b->term_id, 'sequence', true );
+				$a_seq = is_numeric( $a_seq ) ? (int)$a_seq : 99999;
+				$b_seq = is_numeric( $b_seq ) ? (int)$b_seq : 99999;
+				if ( $a_seq === $b_seq ) {
+					return strcmp( $a->name, $b->name );
 				}
-				if ( $guides ) {
-					$additional_item .= '<ul class="faq-guides-list">' . $guides . '</ul>';
-				}
-				$additional_item .= '</div>';
-			}
-			$additional_item .= '</li>';
-
-			// Append the additional term as a child of the root.
-			if ( empty( $sidebar ) ) {
-				// No existing children? Create a new list.
-				$sidebar = '<ul class="faq-sidebar-list level-1">' . $additional_item . '</ul>';
-			} else {
-				// Insert before the closing </ul> tag.
-				$closing_ul = '</ul>';
-				if ( substr( $sidebar, -strlen( $closing_ul ) ) === $closing_ul ) {
-					$sidebar = substr( $sidebar, 0, -strlen( $closing_ul ) ) . $additional_item . $closing_ul;
+				return ($a_seq < $b_seq) ? -1 : 1;
+			} );
+			// Rebuild the sidebar markup based on the sorted terms.
+			$sidebar = '<ul class="faq-sidebar-list level-1">';
+			foreach ( $child_terms as $term ) {
+				// For nested children, we use a higher level (e.g., level 2).
+				$children = build_faq_sidebar_ajax( $term->term_id, $taxonomy, $atts, 2 );
+				$guides   = build_guides_list_ajax( $term->term_id, $atts );
+				$has_children = ( $children || $guides ) ? true : false;
+				$sidebar .= '<li class="faq-sidebar-item" data-term-id="' . esc_attr( $term->term_id ) . '">';
+				if ( $has_children ) {
+					$sidebar .= '<a href="#" class="faq-term-header"><i class="fa fa-chevron-right chevron"></i><span class="term-title">' . esc_html( $term->name ) . '</span></a>';
 				} else {
-					$sidebar .= $additional_item;
+					$sidebar .= '<a href="#" class="faq-term-header"><span class="term-title">' . esc_html( $term->name ) . '</span></a>';
 				}
+				if ( $has_children ) {
+					$sidebar .= '<div class="faq-children" style="display:none;">';
+					if ( $children ) {
+						$sidebar .= $children;
+					}
+					if ( $guides ) {
+						$sidebar .= '<ul class="faq-guides-list">' . $guides . '</ul>';
+					}
+					$sidebar .= '</div>';
+				}
+				$sidebar .= '</li>';
 			}
+			$sidebar .= '</ul>';
 		}
 	}
 
-	// Get the current page URL.
+	$active_guide_slug = get_query_var( 'faq_guide', '' );
 	$current_permalink = trailingslashit( get_permalink() );
 	
 	ob_start();
@@ -644,6 +653,8 @@ add_shortcode( 'faq_list_hierarchy_ajax', 'display_faq_list_hierarchy_ajax' );
 
 /**
  * Recursive function to build the FAQ sidebar.
+ *
+ * NOTE: We now sort the FAQ terms by their "sequence" meta in PHP. Terms missing a valid numeric sequence default to 99999.
  */
 function build_faq_sidebar_ajax( $parent_id, $taxonomy, $atts, $level = 0 ) {
 	$terms = get_terms( array(
@@ -654,6 +665,19 @@ function build_faq_sidebar_ajax( $parent_id, $taxonomy, $atts, $level = 0 ) {
 	if ( empty( $terms ) || is_wp_error( $terms ) ) {
 		return '';
 	}
+
+	// Sort terms by their sequence meta, defaulting to a high value if not set.
+	usort( $terms, function( $a, $b ) {
+		$a_seq = get_term_meta( $a->term_id, 'sequence', true );
+		$b_seq = get_term_meta( $b->term_id, 'sequence', true );
+		$a_seq = is_numeric($a_seq) ? (int)$a_seq : 99999;
+		$b_seq = is_numeric($b_seq) ? (int)$b_seq : 99999;
+		if ( $a_seq === $b_seq ) {
+			return strcmp( $a->name, $b->name );
+		}
+		return ($a_seq < $b_seq) ? -1 : 1;
+	} );
+
 	$output = '<ul class="faq-sidebar-list level-' . $level . '">';
 	foreach ( $terms as $term ) {
 		$children = build_faq_sidebar_ajax( $term->term_id, $taxonomy, $atts, $level + 1 );
@@ -683,18 +707,17 @@ function build_faq_sidebar_ajax( $parent_id, $taxonomy, $atts, $level = 0 ) {
 
 /**
  * Build a list of guides for a specific FAQ term.
+ *
+ * NOTE: The guides are now ordered primarily by their "sequence" meta (numeric) with a secondary order on title.
+ * Guides missing a valid sequence default to 99999.
  */
 function build_guides_list_ajax( $term_id, $atts ) {
 	$taxonomy       = sanitize_text_field( $atts['taxonomy'] );
 	$posts_per_term = intval( $atts['posts_per_term'] );
-	$orderby        = sanitize_text_field( $atts['orderby'] );
-	$order          = sanitize_text_field( $atts['order'] );
-
-	$query = new WP_Query( array(
+	
+	$query_args = array(
 		'post_type'      => 'guide',
 		'posts_per_page' => $posts_per_term,
-		'orderby'        => $orderby,
-		'order'          => $order,
 		'tax_query'      => array(
 			array(
 				'taxonomy'         => $taxonomy,
@@ -703,11 +726,19 @@ function build_guides_list_ajax( $term_id, $atts ) {
 				'include_children' => false,
 			),
 		),
-	) );
+		'meta_key'       => 'sequence',
+		'orderby'        => array(
+			'meta_value_num' => 'ASC',
+			'title'          => 'ASC'
+		)
+	);
+
+	$query = new WP_Query( $query_args );
 
 	if ( ! $query->have_posts() ) {
 		return '';
 	}
+
 	$output = '';
 	while ( $query->have_posts() ) {
 		$query->the_post();

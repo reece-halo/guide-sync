@@ -107,6 +107,7 @@ function sync_article( $article ) {
         'notuseful_count'  => $details['notuseful_count'] ?? 0,
         'next_review_date' => $details['next_review_date'] ?? '',
         'tags'             => $details['kb_tags'] ?? '',
+        'sequence'         => $article['faqdseq'] ?? 0,
     ];
 
     foreach ( $metadata_updates as $meta_key => $meta_value ) {
