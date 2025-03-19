@@ -39,6 +39,36 @@ function faq_redirect_guides_to_halopsa() {
 }
 
 /**
+ * Disable old-style guide URLs.
+ *
+ * If a URL is accessed with the old query parameter (e.g. ?guide=changing-your-halo-url),
+ * return a 404 page.
+ */
+function disable_system_guide_url() {
+	if ( isset( $_GET['guide'] ) ) {
+		global $wp_query;
+		$wp_query->set_404();
+		status_header( 404 );
+		nocache_headers();
+		
+		// If Elementor's 404 template exists, output it.
+		if ( function_exists( 'elementor_theme_do_location' ) && elementor_theme_do_location( '404' ) ) {
+			exit;
+		}
+		
+		// Fallback: try to get the default 404 template.
+		$template = get_query_template( '404' );
+		if ( $template ) {
+			include( $template );
+			exit;
+		} else {
+			wp_die( '404 Not Found', '404', array( 'response' => 404 ) );
+		}
+	}
+}
+add_action( 'template_redirect', 'disable_system_guide_url', 5 );
+
+/**
  * AJAX handler for loading a guide’s content.
  */
 add_action( 'wp_ajax_load_guide_content', 'faq_load_guide_content' );
@@ -109,8 +139,6 @@ function faq_search_guides() {
 			$results[] = array(
 				'title'      => get_the_title(),
 				'excerpt'    => get_the_excerpt(),
-				// Note: Here the permalink is generated using get_permalink()
-				// You might update this if needed.
 				'permalink'  => trailingslashit( get_permalink() ) . $guide_identifier,
 				'guide_slug' => $guide_identifier,
 			);
@@ -158,15 +186,12 @@ function display_faq_list_hierarchy_ajax( $atts ) {
 	if ( $root_term && ! empty( $atts['additional_root'] ) ) {
 		$additional_term = get_faq_term_by_halo_id( sanitize_text_field( $atts['additional_root'] ), $taxonomy );
 		if ( $additional_term ) {
-			// Get existing child terms of the root.
 			$child_terms = get_terms( array(
 				'taxonomy'   => $taxonomy,
 				'hide_empty' => true,
 				'parent'     => $root_term->term_id,
 			) );
-			// Add the additional term.
 			$child_terms[] = $additional_term;
-			// Sort terms by their "sequence" meta value (defaulting to 99999 if not set).
 			usort( $child_terms, function( $a, $b ) {
 				$a_seq = get_term_meta( $a->term_id, 'sequence', true );
 				$b_seq = get_term_meta( $b->term_id, 'sequence', true );
@@ -177,10 +202,8 @@ function display_faq_list_hierarchy_ajax( $atts ) {
 				}
 				return ($a_seq < $b_seq) ? -1 : 1;
 			} );
-			// Rebuild the sidebar markup based on the sorted terms.
 			$sidebar = '<ul class="faq-sidebar-list level-1">';
 			foreach ( $child_terms as $term ) {
-				// For nested children, we use a higher level (e.g., level 2).
 				$children = build_faq_sidebar_ajax( $term->term_id, $taxonomy, $atts, 2 );
 				$guides   = build_guides_list_ajax( $term->term_id, $atts );
 				$has_children = ( $children || $guides ) ? true : false;
@@ -270,7 +293,6 @@ function display_faq_list_hierarchy_ajax( $atts ) {
 		margin-bottom: 15px;
 		position: relative;
 	}
-	/* Extra right padding so buttons remain outside the text area */
 	#faq-search {
 		width: 100%;
 		padding: 10px 15px;
@@ -280,7 +302,6 @@ function display_faq_list_hierarchy_ajax( $atts ) {
 		box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.1);
 		font-size: 16px;
 	}
-	/* Search button styling */
 	#faq-search-button {
 	    padding: 2px;
 		background: none;
@@ -289,7 +310,6 @@ function display_faq_list_hierarchy_ajax( $atts ) {
 		font-size: 18px;
 		color: black;
 	}
-	/* Clear button styling */
 	#faq-clear-button {
 	    padding: 2px;
 		background: none;
@@ -309,7 +329,6 @@ function display_faq_list_hierarchy_ajax( $atts ) {
 	    justify-content: right;
 	    gap: 6px;
 	}
-	/* New container for the FAQ list only */
 	#faq-sidebar-list-container {
 		margin-top: 20px;
 	}
@@ -373,15 +392,12 @@ function display_faq_list_hierarchy_ajax( $atts ) {
 		background: #0073aa;
 		color: white !important;
 	}
-	
 	.styled-table td {
 	    color: black;
 	}
-	
 	[id] {
         scroll-margin-top: 110px;
     }
-	
 	@media (max-width: 768px) {
 		.faq-component {
 			flex-direction: column;
@@ -397,8 +413,6 @@ function display_faq_list_hierarchy_ajax( $atts ) {
 		}
 	}
 	</style>
-
-	<!-- The data-baseurl attribute is used by the JS to update the URL dynamically -->
 	<div class="faq-component" data-baseurl="<?php echo esc_url( $current_permalink ); ?>">
 		<div class="faq-sidebar">
 			<div class="faq-search-container">
@@ -424,17 +438,12 @@ function display_faq_list_hierarchy_ajax( $atts ) {
 			</div>
 		</div>
 	</div>
-
 	<script>
 		(function(){
-			// Store the original FAQ list markup for reverting after search.
 			var sidebarListContainer = document.getElementById('faq-sidebar-list-container');
 			var originalSidebar = sidebarListContainer.innerHTML;
-			
 			var searchInput = document.getElementById('faq-search');
 			var clearButton = document.getElementById('faq-clear-button');
-
-			// If the search input is inside a form, prevent form submission.
 			var parentForm = searchInput.closest('form');
 			if (parentForm) {
 				parentForm.addEventListener('submit', function(e) {
@@ -442,8 +451,6 @@ function display_faq_list_hierarchy_ajax( $atts ) {
 					return false;
 				});
 			}
-
-			// Toggle the clear button's visibility based on input content.
 			searchInput.addEventListener('input', function(e) {
 				if(e.target.value.trim() !== '') {
 					clearButton.style.display = 'block';
@@ -452,15 +459,11 @@ function display_faq_list_hierarchy_ajax( $atts ) {
 					sidebarListContainer.innerHTML = originalSidebar;
 				}
 			});
-
-			// Clear search input and restore the original FAQ list.
 			clearButton.addEventListener('click', function() {
 				searchInput.value = '';
 				clearButton.style.display = 'none';
 				sidebarListContainer.innerHTML = originalSidebar;
 			});
-
-			// Delegated event for toggling FAQ term expansion/collapse.
 			document.addEventListener('click', function(e) {
 				var header = e.target.closest('.faq-term-header');
 				if (header && header.parentElement && header.parentElement.classList.contains('faq-sidebar-item')) {
@@ -480,14 +483,11 @@ function display_faq_list_hierarchy_ajax( $atts ) {
 					}
 				}
 			});
-
-			// Attach click event to guide links (using event delegation).
 			document.addEventListener('click', function(e) {
 				if(e.target && e.target.classList.contains('faq-guide-link')) {
 					e.preventDefault();
 					var guideIdentifier = e.target.getAttribute('data-guide-slug');
 					loadGuideContent(guideIdentifier);
-					// Update active class.
 					document.querySelectorAll('.faq-guide-link').forEach(function(link) {
 						link.classList.remove('active');
 					});
@@ -499,8 +499,6 @@ function display_faq_list_hierarchy_ajax( $atts ) {
 					window.scrollTo({ top: offset, behavior: 'smooth' });
 				}
 			});
-
-			// Function to load guide content via Ajax.
 			function loadGuideContent( guideIdentifier ) {
                 var contentDiv = document.getElementById('faq-guide-content');
                 contentDiv.innerHTML = '<p>Loading guide content...</p>';
@@ -514,19 +512,17 @@ function display_faq_list_hierarchy_ajax( $atts ) {
                             var response = JSON.parse( xhr.responseText );
                             if ( response.success ) {
                                 contentDiv.innerHTML = '<h2>' + response.data.title + '</h2>' + response.data.content;
-                                // After content loads, check if there is a hash in the URL and scroll to that element.
                                 if (window.location.hash) {
                                     setTimeout(function(){
                                         var targetId = window.location.hash.substring(1);
                                         var targetElem = document.getElementById(targetId);
                                         if (targetElem) {
-                                            // Set the header height offset (adjust as needed)
                                             var headerOffset = 120;
                                             var elementPosition = targetElem.getBoundingClientRect().top;
                                             var offsetPosition = elementPosition + window.pageYOffset - headerOffset;
                                             window.scrollTo({ top: offsetPosition, behavior: 'smooth' });
                                         }
-                                    }, 100); // adjust delay if necessary
+                                    }, 100);
                                 }
                             } else {
                                 contentDiv.innerHTML = '<p>Error: ' + response.data + '</p>';
@@ -540,12 +536,8 @@ function display_faq_list_hierarchy_ajax( $atts ) {
                 };
                 xhr.send( data );
             }
-
-			// Function to filter the FAQ list based on matching guide slugs.
 			function filterSidebarByResults(matchingSlugs) {
-				// Reset FAQ list to original markup.
 				sidebarListContainer.innerHTML = originalSidebar;
-				// For each guide link in the FAQ list:
 				var guideLinks = sidebarListContainer.querySelectorAll('.faq-guide-link');
 				guideLinks.forEach(function(link) {
 					var slug = link.getAttribute('data-guide-slug');
@@ -556,7 +548,6 @@ function display_faq_list_hierarchy_ajax( $atts ) {
 						}
 					}
 				});
-				// Iterate over FAQ sidebar items to hide those without visible matching guides.
 				var faqItems = sidebarListContainer.querySelectorAll('.faq-sidebar-item');
 				var faqItemsArray = Array.from(faqItems).reverse();
 				faqItemsArray.forEach(function(item) {
@@ -564,7 +555,6 @@ function display_faq_list_hierarchy_ajax( $atts ) {
 					if (!visibleGuide) {
 						item.style.display = 'none';
 					} else {
-						// Expand the item to show its children.
 						var childrenContainer = item.querySelector('.faq-children');
 						if (childrenContainer) {
 							childrenContainer.style.display = 'block';
@@ -576,8 +566,6 @@ function display_faq_list_hierarchy_ajax( $atts ) {
 					}
 				});
 			}
-
-			// Server-side search function.
 			function searchGuides(query) {
 				var xhr = new XMLHttpRequest();
 				xhr.open('POST', '<?php echo admin_url('admin-ajax.php'); ?>', true);
@@ -603,8 +591,6 @@ function display_faq_list_hierarchy_ajax( $atts ) {
 				};
 				xhr.send('action=faq_search_guides&search_term=' + encodeURIComponent(query));
 			}
-
-			// Event listener for search input to trigger search on Enter key.
 			searchInput.addEventListener('keydown', function(e) {
 				if (e.key === 'Enter') {
 					e.preventDefault();
@@ -617,8 +603,6 @@ function display_faq_list_hierarchy_ajax( $atts ) {
 					}
 				}
 			});
-
-			// Event listener for search button click.
 			document.getElementById('faq-search-button').addEventListener('click', function() {
 				var query = searchInput.value.trim();
 				if(query === '') {
@@ -627,8 +611,6 @@ function display_faq_list_hierarchy_ajax( $atts ) {
 					searchGuides(query);
 				}
 			});
-
-			// On page load: if a guide is specified in the URL, load its content and expand parent items.
 			<?php if ( ! empty( $active_guide_slug ) ) : ?>
 				document.addEventListener('DOMContentLoaded', function(){
 					var activeLink = document.querySelector('.faq-guide-link[data-guide-slug="<?php echo esc_js( $active_guide_slug ); ?>"]');
@@ -659,8 +641,6 @@ add_shortcode( 'faq_list_hierarchy_ajax', 'display_faq_list_hierarchy_ajax' );
 
 /**
  * Recursive function to build the FAQ sidebar.
- *
- * NOTE: We now sort the FAQ terms by their "sequence" meta in PHP. Terms missing a valid numeric sequence default to 99999.
  */
 function build_faq_sidebar_ajax( $parent_id, $taxonomy, $atts, $level = 0 ) {
 	$terms = get_terms( array(
@@ -671,8 +651,6 @@ function build_faq_sidebar_ajax( $parent_id, $taxonomy, $atts, $level = 0 ) {
 	if ( empty( $terms ) || is_wp_error( $terms ) ) {
 		return '';
 	}
-
-	// Sort terms by their sequence meta, defaulting to a high value if not set.
 	usort( $terms, function( $a, $b ) {
 		$a_seq = get_term_meta( $a->term_id, 'sequence', true );
 		$b_seq = get_term_meta( $b->term_id, 'sequence', true );
@@ -683,7 +661,6 @@ function build_faq_sidebar_ajax( $parent_id, $taxonomy, $atts, $level = 0 ) {
 		}
 		return ($a_seq < $b_seq) ? -1 : 1;
 	} );
-
 	$output = '<ul class="faq-sidebar-list level-' . $level . '">';
 	foreach ( $terms as $term ) {
 		$children = build_faq_sidebar_ajax( $term->term_id, $taxonomy, $atts, $level + 1 );
@@ -713,14 +690,10 @@ function build_faq_sidebar_ajax( $parent_id, $taxonomy, $atts, $level = 0 ) {
 
 /**
  * Build a list of guides for a specific FAQ term.
- *
- * NOTE: The guides are now ordered primarily by their "sequence" meta (numeric) with a secondary order on title.
- * Guides missing a valid sequence default to 99999.
  */
 function build_guides_list_ajax( $term_id, $atts ) {
 	$taxonomy       = sanitize_text_field( $atts['taxonomy'] );
 	$posts_per_term = intval( $atts['posts_per_term'] );
-	
 	$query_args = array(
 		'post_type'      => 'guide',
 		'posts_per_page' => $posts_per_term,
@@ -738,13 +711,10 @@ function build_guides_list_ajax( $term_id, $atts ) {
 			'title'          => 'ASC'
 		)
 	);
-
 	$query = new WP_Query( $query_args );
-
 	if ( ! $query->have_posts() ) {
 		return '';
 	}
-
 	$output = '';
 	while ( $query->have_posts() ) {
 		$query->the_post();
@@ -752,7 +722,6 @@ function build_guides_list_ajax( $term_id, $atts ) {
 		if ( empty( $guide_identifier ) ) {
 			$guide_identifier = get_post_field( 'post_name', get_the_ID() );
 		}
-		// Use the globally defined base URL instead of get_permalink()
 		global $faq_current_permalink;
 		$guide_url = trailingslashit( $faq_current_permalink ) . $guide_identifier;
 		$output   .= '<li class="faq-guide-item">';
