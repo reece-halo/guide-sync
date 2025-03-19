@@ -28,7 +28,7 @@ function faq_register_rewrite_rules() {
 }
 
 /**
- * Template redirect: if the URL includes guides_redirect, redirect to /halopsa/guides.
+ * Template redirect: if the URL includes guides_redirect, redirect to the homepage.
  */
 add_action( 'template_redirect', 'faq_redirect_guides_to_halopsa' );
 function faq_redirect_guides_to_halopsa() {
@@ -109,6 +109,8 @@ function faq_search_guides() {
 			$results[] = array(
 				'title'      => get_the_title(),
 				'excerpt'    => get_the_excerpt(),
+				// Note: Here the permalink is generated using get_permalink()
+				// You might update this if needed.
 				'permalink'  => trailingslashit( get_permalink() ) . $guide_identifier,
 				'guide_slug' => $guide_identifier,
 			);
@@ -142,6 +144,12 @@ function display_faq_list_hierarchy_ajax( $atts ) {
 	}
 	// Determine the parent based on the root.
 	$parent_id = ( $root_term ) ? $root_term->term_id : 0;
+
+	// Set the base URL for guide links.
+	$current_permalink = trailingslashit( get_permalink() );
+	// Make it available globally.
+	global $faq_current_permalink;
+	$faq_current_permalink = $current_permalink;
 
 	// Build the sidebar markup using children of the root.
 	$sidebar = build_faq_sidebar_ajax( $parent_id, $taxonomy, $atts );
@@ -199,7 +207,6 @@ function display_faq_list_hierarchy_ajax( $atts ) {
 	}
 
 	$active_guide_slug = get_query_var( 'faq_guide', '' );
-	$current_permalink = trailingslashit( get_permalink() );
 	
 	ob_start();
 	?>
@@ -534,7 +541,6 @@ function display_faq_list_hierarchy_ajax( $atts ) {
                 xhr.send( data );
             }
 
-
 			// Function to filter the FAQ list based on matching guide slugs.
 			function filterSidebarByResults(matchingSlugs) {
 				// Reset FAQ list to original markup.
@@ -746,7 +752,9 @@ function build_guides_list_ajax( $term_id, $atts ) {
 		if ( empty( $guide_identifier ) ) {
 			$guide_identifier = get_post_field( 'post_name', get_the_ID() );
 		}
-		$guide_url = trailingslashit( get_permalink() ) . $guide_identifier;
+		// Use the globally defined base URL instead of get_permalink()
+		global $faq_current_permalink;
+		$guide_url = trailingslashit( $faq_current_permalink ) . $guide_identifier;
 		$output   .= '<li class="faq-guide-item">';
 		$output   .= '<a href="' . esc_url( $guide_url ) . '" class="faq-guide-link" data-guide-slug="' . esc_attr( $guide_identifier ) . '">' . get_the_title() . '</a>';
 		$output   .= '</li>';
