@@ -240,7 +240,9 @@ function display_faq_list_hierarchy_ajax( $atts ) {
 	.faq-component {
 		display: flex;
 		align-items: flex-start;
+		/* gap: 50px; */
 		max-width: 1360px;
+		width: 100%;
 		margin: 30px auto;
 		background: #fff;
 		color: black;
@@ -248,17 +250,35 @@ function display_faq_list_hierarchy_ajax( $atts ) {
 	}
 	.faq-sidebar {
         flex: 0 0 300px;
-        padding: 20px;
+        padding: 10px;
         overflow-y: auto;
         position: sticky;
         top: 100px;
         max-height: calc(100vh - 100px);
         align-self: flex-start;
+
+		margin-left: 20px;
+
+		border-radius: 10px;
+		border: 1px solid #f1f5fb;
+	    box-shadow: 0 4px 5px 0 rgba(36, 50, 66, .1);
+
+		-ms-overflow-style: none;  /* IE and Edge */
+  		scrollbar-width: none;  /* Firefox */
     }
+	.faq-sidebar::-webkit-scrollbar {
+		display: none;
+	}
 	.faq-main {
+	  margin: 0 20px 20px 20px;
+	  max-width: 1000px;
+	  width: 100%;
       flex: 1;
       padding: 30px;
       background: #fff;
+	  border-radius: 10px;
+	  border: 1px solid #f1f5fb;
+	  box-shadow: 0 4px 5px 0 rgba(36, 50, 66, .1);
     }
 	.faq-main h1 {
       font-size: 2rem;
@@ -284,7 +304,7 @@ function display_faq_list_hierarchy_ajax( $atts ) {
       padding-left: 20px;
     }
 	.faq-main img {
-      max-width: 100%;
+      max-width: 100% !important;
       height: auto;
       object-fit: contain;
       margin: 20px 0;
@@ -295,7 +315,7 @@ function display_faq_list_hierarchy_ajax( $atts ) {
 	}
 	#faq-search {
 		width: 100%;
-		padding: 10px 15px;
+		padding: 6px 12px;
 		padding-right: 70px;
 		border: none;
 		border-radius: 25px;
@@ -340,33 +360,55 @@ function display_faq_list_hierarchy_ajax( $atts ) {
 	.faq-sidebar-list li {
 		margin-bottom: 5px;
 	}
+	.level-0 > .faq-sidebar-item {
+		padding-top: 8px !important;
+		padding-bottom: 8px !important;
+	}
+	.level-0 > .faq-sidebar-item:not(:last-child) {
+		border-bottom-width: 1px !important;
+		border-bottom-style: solid !important;
+		border-bottom-color: rgb(241, 245, 251) !important;
+	}
+	.guide-count {
+		font-weight: light !important;
+		font-size: 11px;
+	}
 	.faq-term-header {
 		display: flex;
 		align-items: center;
 		justify-content: flex-start;
-		padding: 8px 10px;
-		background: #ffffff;
-		border-radius: 8px;
+		padding: 2px 4px;
+		/* background: #ffffff; */
+		border-radius: 4px;
 		color: #000 !important;
-		text-decoration: none;
+		text-decoration: none !important;
 		font-size: 15px;
 		transition: background 0.3s ease, transform 0.2s ease;
-		box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+		/* box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05); */
 		cursor: pointer;
+	}
+	.level-0 > .faq-sidebar-item > .faq-term-header {
+		font-weight: 500;
 	}
 	.faq-term-header .chevron {
 		margin-right: 10px;
 		font-size: 12px;
 		transition: transform 0.3s ease;
 	}
+	.faq-term-header .search-icon {
+		font-size: 12px;
+		transition: transform 0.3s ease;
+	}
 	.faq-term-header .chevron.expanded {
 		transform: rotate(90deg);
+	}
+	.faq-term-header .search-icon.expanded {
+		display: block !important;
 	}
 	.faq-children {
 		margin-left: 10px;
 		margin-top: 4px;
 		padding-left: 5px;
-		border-left: 1px solid #ddd;
 	}
 	.faq-guides-list {
 		list-style: none;
@@ -375,14 +417,14 @@ function display_faq_list_hierarchy_ajax( $atts ) {
 	}
 	.faq-guide-link {
 		display: block;
-		padding: 8px 10px;
-		background: #fff;
-		border-radius: 8px;
+		padding: 2px 4px;
+		/* background: #fff; */
+		border-radius: 4px;
 		color: #000 !important;
-		text-decoration: none;
+		text-decoration: none !important;
 		font-size: 14px;
 		transition: background 0.3s ease, color 0.3s ease, transform 0.2s ease;
-		box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+		/* box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05); */
 	}
 	.faq-guide-link:hover {
 		background: #e1f5fe;
@@ -475,10 +517,16 @@ function display_faq_list_hierarchy_ajax( $atts ) {
 							childrenContainer.style.display = 'block';
 							var chevron = header.querySelector('.chevron');
 							if(chevron) { chevron.classList.add('expanded'); }
+
+							var searchIcon = header.querySelector('.search-icon');
+							if(searchIcon) { searchIcon.classList.add('expanded'); }
 						} else {
 							childrenContainer.style.display = 'none';
 							var chevron = header.querySelector('.chevron');
 							if(chevron) { chevron.classList.remove('expanded'); }
+
+							var searchIcon = header.querySelector('.search-icon');
+							if(searchIcon) { searchIcon.classList.remove('expanded'); }
 						}
 					}
 				}
@@ -664,16 +712,26 @@ function build_faq_sidebar_ajax( $parent_id, $taxonomy, $atts, $level = 0 ) {
 	$output = '<ul class="faq-sidebar-list level-' . $level . '">';
 	foreach ( $terms as $term ) {
 		$children = build_faq_sidebar_ajax( $term->term_id, $taxonomy, $atts, $level + 1 );
-		$guides   = build_guides_list_ajax( $term->term_id, $atts );
+		$guides_build   = build_guides_list_ajax( $term->term_id, $atts );
+		$guides = $guides_build[0];
+		$guides_count = $guides_build[1];
 		$has_children = ( $children || $guides ) ? true : false;
 		$output .= '<li class="faq-sidebar-item" data-term-id="' . esc_attr( $term->term_id ) . '">';
-		if ( $has_children ) {
-			$output .= '<a href="#" class="faq-term-header"><i class="fa fa-chevron-right chevron"></i><span class="term-title">' . esc_html( $term->name ) . '</span></a>';
-		} else {
+
+		$collapsed = (count($terms) <= 10 && $guides_count <= 10 && $level == 0) ? 'block' : 'none';
+		$search_icon = ($level == 0) ? '<i style="display: ' . $collapsed . ';" class="fa-solid fa-magnifying-glass search-icon"></i>' : '';
+		$set_collapsed = (count($terms) <= 10 && $guides_count <= 10 && $level == 0) ? true : false;
+
+		if ( $has_children && $set_collapsed ) {
+			$output .= '<a href="#" class="faq-term-header" style="display: flex; justify-content: space-between;"><span class="term-title">' . esc_html( $term->name ) . '</span><div style="display: flex; align-items: right; gap: 7px;">' . $search_icon . '<i class="fa fa-chevron-right chevron expanded"></i></div></a>';
+		} else if ( $has_children ) {
+			$output .= '<a href="#" class="faq-term-header" style="display: flex; justify-content: space-between;"><span class="term-title">' . esc_html( $term->name ) . '</span><div style="display: flex; align-items: center; gap: 7px;"><span class="guide-count">' . $guides_count . '</span> ' . $search_icon . '<i class="fa fa-chevron-right chevron"></i></div></a>';
+		}
+		else {
 			$output .= '<a href="#" class="faq-term-header"><span class="term-title">' . esc_html( $term->name ) . '</span></a>';
 		}
 		if ( $has_children ) {
-			$output .= '<div class="faq-children" style="display:none;">';
+			$output .= '<div class="faq-children" style="display: ' . $collapsed . ';">';
 			if ( $children ) {
 				$output .= $children;
 			}
@@ -716,6 +774,7 @@ function build_guides_list_ajax( $term_id, $atts ) {
 		return '';
 	}
 	$output = '';
+	$guide_count = 0;
 	while ( $query->have_posts() ) {
 		$query->the_post();
 		$guide_identifier = get_post_meta( get_the_ID(), 'external_article_id', true );
@@ -727,9 +786,10 @@ function build_guides_list_ajax( $term_id, $atts ) {
 		$output   .= '<li class="faq-guide-item">';
 		$output   .= '<a href="' . esc_url( $guide_url ) . '" class="faq-guide-link" data-guide-slug="' . esc_attr( $guide_identifier ) . '">' . get_the_title() . '</a>';
 		$output   .= '</li>';
+		$guide_count++;
 	}
 	wp_reset_postdata();
-	return $output;
+	return [$output, $guide_count];
 }
 
 /**
