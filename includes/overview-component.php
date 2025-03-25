@@ -119,32 +119,34 @@ function faq_search_guides() {
 	if ( empty( $search_query ) ) {
 		wp_send_json_error( 'No search term provided.' );
 	}
-	
-	$args = array(
-		'post_type'      => 'guide',
-		'posts_per_page' => -1,
-		's'              => '" ' . $search_query . ' "',
-	);
-	
-	$query = new WP_Query( $args );
-	
+
+	$api_url = 'https://halo.haloservicedesk.com/api/KBArticle?isportal=true&search=' . $search_query . '&pageinate=true&page_size=25&page_no=1';
+    $response = wp_remote_get( $api_url );
+
+    if ( is_wp_error( $response ) ) {
+        error_log( 'API Error: ' . $response->get_error_message() );
+        return;
+    }
+
+    $data = json_decode( wp_remote_retrieve_body( $response ), true );
+
+    if ( empty( $data ) || ! isset( $data['articles'] ) || ! is_array( $data['articles'] ) ) {
+        error_log( 'Invalid API response' );
+        return;
+    }
+
+    $articles = $data['articles'];
+
 	$results = array();
-	if ( $query->have_posts() ) {
-		while ( $query->have_posts() ) {
-			$query->the_post();
-			$guide_identifier = get_post_meta( get_the_ID(), 'external_article_id', true );
-			if ( empty( $guide_identifier ) ) {
-				$guide_identifier = get_post_field( 'post_name', get_the_ID() );
-			}
-			$results[] = array(
-				'title'      => get_the_title(),
-				'excerpt'    => get_the_excerpt(),
-				'permalink'  => trailingslashit( get_permalink() ) . $guide_identifier,
-				'guide_slug' => $guide_identifier,
-			);
-		}
-		wp_reset_postdata();
-	}
+    foreach ( $articles as $article ) {
+		$results[] = array(
+			'title'      => $article['name'],
+			'excerpt'    => $article['name'],
+			'permalink'  => trailingslashit( get_permalink() ) . $article['id'],
+			'guide_slug' => '' . $article['id'] . '',
+		);
+    }
+	wp_reset_postdata();
 	
 	wp_send_json_success( $results );
 }
@@ -402,6 +404,9 @@ function display_faq_list_hierarchy_ajax( $atts ) {
 	.faq-term-header .chevron.expanded {
 		transform: rotate(90deg);
 	}
+	.search-icon {
+		display: none;
+	}
 	.faq-term-header .search-icon.expanded {
 		display: block !important;
 	}
@@ -436,6 +441,13 @@ function display_faq_list_hierarchy_ajax( $atts ) {
 	}
 	.styled-table td {
 	    color: black;
+	}
+	.faq-search-results {
+		list-style-type: none;
+		padding-left: 0;
+	}
+	.faq-search-results li {
+		padding-bottom: 5px;
 	}
 	[id] {
         scroll-margin-top: 110px;
@@ -623,10 +635,7 @@ function display_faq_list_hierarchy_ajax( $atts ) {
 						try {
 							var response = JSON.parse(xhr.responseText);
 							if(response.success) {
-								var matchingSlugs = response.data.map(function(item) {
-									return item.guide_slug;
-								});
-								filterSidebarByResults(matchingSlugs);
+								displaySearchResults(response.data);
 							} else {
 								console.error('Search error:', response.data);
 							}
@@ -638,6 +647,14 @@ function display_faq_list_hierarchy_ajax( $atts ) {
 					}
 				};
 				xhr.send('action=faq_search_guides&search_term=' + encodeURIComponent(query));
+			}
+			function displaySearchResults(results) {
+				var html = '<ul class="faq-search-results">';
+				results.forEach(function(result) {
+					html += '<li><a href="#" class="faq-guide-link" data-guide-slug="' + result.guide_slug + '">' + result.title + '</a></li>';
+				});
+				html += '</ul>';
+				sidebarListContainer.innerHTML = html;
 			}
 			searchInput.addEventListener('keydown', function(e) {
 				if (e.key === 'Enter') {
@@ -719,8 +736,9 @@ function build_faq_sidebar_ajax( $parent_id, $taxonomy, $atts, $level = 0 ) {
 		$output .= '<li class="faq-sidebar-item" data-term-id="' . esc_attr( $term->term_id ) . '">';
 
 		$collapsed = (count($terms) <= 10 && $guides_count <= 10 && $level == 0) ? 'block' : 'none';
-		$search_icon = ($level == 0) ? '<i style="display: ' . $collapsed . ';" class="fa-solid fa-magnifying-glass search-icon"></i>' : '';
 		$set_collapsed = (count($terms) <= 10 && $guides_count <= 10 && $level == 0) ? true : false;
+
+		$search_icon = ($level == 0) ? ('<i class="fa-solid fa-magnifying-glass search-icon' . (($set_collapsed == true) ? ' expanded' : '') . '"></i>') : '';
 
 		if ( $has_children && $set_collapsed ) {
 			$output .= '<a href="#" class="faq-term-header" style="display: flex; justify-content: space-between;"><span class="term-title">' . esc_html( $term->name ) . '</span><div style="display: flex; align-items: right; gap: 7px;">' . $search_icon . '<i class="fa fa-chevron-right chevron expanded"></i></div></a>';
