@@ -252,7 +252,7 @@ function display_faq_list_hierarchy_ajax( $atts ) {
 	}
 	.faq-sidebar {
         flex: 0 0 300px;
-        padding: 10px;
+        padding: 10px 10px 0 10px;
         overflow-y: auto;
         position: sticky;
         top: 100px;
@@ -272,7 +272,7 @@ function display_faq_list_hierarchy_ajax( $atts ) {
 		display: none;
 	}
 	.faq-main {
-	  margin: 0 20px 20px 20px;
+	  margin: 0 20px 0 20px;
 	  max-width: 1000px;
 	  width: 100%;
       flex: 1;
