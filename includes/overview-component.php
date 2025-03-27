@@ -109,18 +109,43 @@ function faq_load_guide_content() {
 	) );
 }
 
+function get_faq_term_path( $term, $taxonomy ) {
+    // Get all ancestor term IDs.
+    $ancestors = get_ancestors( $term->term_id, $taxonomy, 'taxonomy' );
+    // Reverse to get the top-most first.
+    $ancestors = array_reverse( $ancestors );
+    $path = array();
+    // Get each ancestor term's name.
+    foreach ( $ancestors as $ancestor_id ) {
+        $ancestor = get_term( $ancestor_id, $taxonomy );
+        if ( ! is_wp_error( $ancestor ) ) {
+            $path[] = $ancestor->name;
+        }
+    }
+    // Finally, add the term itself.
+    $path[] = $term->name;
+    
+    // Remove the top-level department if it matches one of the specified values.
+    $departments = array('HaloPSA Website', 'HaloITSM Guides', 'HaloCRM Guides');
+    if ( ! empty( $path ) && in_array( $path[0], $departments ) ) {
+        array_shift( $path );
+    }
+    
+    return implode( ' > ', $path );
+}
+
 /**
  * AJAX handler for server-side searching of guides by full content.
  */
 add_action( 'wp_ajax_faq_search_guides', 'faq_search_guides' );
 add_action( 'wp_ajax_nopriv_faq_search_guides', 'faq_search_guides' );
 function faq_search_guides() {
-	$search_query = isset( $_POST['search_term'] ) ? sanitize_text_field( $_POST['search_term'] ) : '';
-	if ( empty( $search_query ) ) {
-		wp_send_json_error( 'No search term provided.' );
-	}
+    $search_query = isset( $_POST['search_term'] ) ? sanitize_text_field( $_POST['search_term'] ) : '';
+    if ( empty( $search_query ) ) {
+        wp_send_json_error( 'No search term provided.' );
+    }
 
-	$api_url = 'https://halo.haloservicedesk.com/api/KBArticle?isportal=true&search=' . $search_query . '&pageinate=true&page_size=25&page_no=1';
+    $api_url  = 'https://halo.haloservicedesk.com/api/KBArticle?isportal=true&search=' . $search_query . '&pageinate=true&page_size=100&page_no=1';
     $response = wp_remote_get( $api_url );
 
     if ( is_wp_error( $response ) ) {
@@ -129,26 +154,62 @@ function faq_search_guides() {
     }
 
     $data = json_decode( wp_remote_retrieve_body( $response ), true );
-
     if ( empty( $data ) || ! isset( $data['articles'] ) || ! is_array( $data['articles'] ) ) {
         error_log( 'Invalid API response' );
         return;
     }
 
     $articles = $data['articles'];
+    $results  = array();
+    global $faq_current_permalink;
 
-	$results = array();
     foreach ( $articles as $article ) {
-		$results[] = array(
-			'title'      => $article['name'],
-			'excerpt'    => $article['name'],
-			'permalink'  => trailingslashit( get_permalink() ) . $article['id'],
-			'guide_slug' => '' . $article['id'] . '',
-		);
+        // Attempt to find a matching guide post using the API article id.
+        $guide_posts = get_posts( array(
+            'post_type'      => 'guide',
+            'posts_per_page' => 1,
+            'meta_query'     => array(
+                array(
+                    'key'     => 'external_article_id',
+                    'value'   => $article['id'],
+                    'compare' => '='
+                )
+            )
+        ) );
+
+        // Skip this article if no matching guide is found.
+        if ( empty( $guide_posts ) ) {
+            continue;
+        }
+
+        $guide       = $guide_posts[0];
+        $permalink   = get_permalink( $guide->ID );
+        $guide_slug  = $guide->post_name;
+        $full_path   = '';
+
+        // Try to retrieve the guide's term in the faq_list taxonomy.
+        $terms = get_the_terms( $guide->ID, 'faq_list' );
+        if ( $terms && ! is_wp_error( $terms ) ) {
+            // If the guide belongs to multiple terms, choose one (here we pick the first).
+            $term      = reset( $terms );
+            $full_path = get_faq_term_path( $term, 'faq_list' );
+        }
+
+        $results[] = array(
+            'title'         => $article['name'],
+            'excerpt'       => $article['name'],
+            'permalink'     => $permalink,
+            'guide_slug'    => $article['id'],
+            'full_path'     => $full_path,
+            'view_count'    => $article['view_count'],
+            'useful_count'  => $article['useful_count'],
+            'notuseful_count'=> $article['notuseful_count'],
+            'url'           => $permalink,
+        );
     }
-	wp_reset_postdata();
-	
-	wp_send_json_success( $results );
+
+    wp_reset_postdata();
+    wp_send_json_success( $results );
 }
 
 /**
@@ -182,7 +243,7 @@ function display_faq_list_hierarchy_ajax( $atts ) {
 	$faq_current_permalink = $current_permalink;
 
 	// Build the sidebar markup using children of the root.
-	$sidebar = build_faq_sidebar_ajax( $parent_id, $taxonomy, $atts );
+	$sidebar = build_faq_sidebar_ajax( $parent_id, $taxonomy, $atts )[0];
 
 	// If an additional FAQ list is provided, merge it with the root's children and sort by sequence.
 	if ( $root_term && ! empty( $atts['additional_root'] ) ) {
@@ -206,7 +267,7 @@ function display_faq_list_hierarchy_ajax( $atts ) {
 			} );
 			$sidebar = '<ul class="faq-sidebar-list level-1">';
 			foreach ( $child_terms as $term ) {
-				$children = build_faq_sidebar_ajax( $term->term_id, $taxonomy, $atts, 2 );
+				$children = build_faq_sidebar_ajax( $term->term_id, $taxonomy, $atts, 2 )[0];
 				$guides   = build_guides_list_ajax( $term->term_id, $atts );
 				$has_children = ( $children || $guides ) ? true : false;
 				$sidebar .= '<li class="faq-sidebar-item" data-term-id="' . esc_attr( $term->term_id ) . '">';
@@ -251,12 +312,12 @@ function display_faq_list_hierarchy_ajax( $atts ) {
 		position: relative;
 	}
 	.faq-sidebar {
-        flex: 0 0 300px;
+        flex: 0 0 305px;
         padding: 10px 10px 0 10px;
         overflow-y: auto;
         position: sticky;
         top: 100px;
-        max-height: calc(100vh - 100px);
+        max-height: calc(100vh - 200px);
         align-self: flex-start;
 
 		margin-left: 20px;
@@ -265,22 +326,37 @@ function display_faq_list_hierarchy_ajax( $atts ) {
 		border: 1px solid #f1f5fb;
 	    box-shadow: 0 4px 5px 0 rgba(36, 50, 66, .1);
 
-		-ms-overflow-style: none;  /* IE and Edge */
-  		scrollbar-width: none;  /* Firefox */
+		scrollbar-width: thin; /* For Firefox */
+  		-ms-overflow-style: auto; /* For IE and Edge */
     }
 	.faq-sidebar::-webkit-scrollbar {
-		display: none;
+		width: 5px;   /* Adjust the width as desired */
+		height: 5px;  /* Adjust the height for horizontal scrollbar, if needed */
+	}
+
+	.faq-sidebar::-webkit-scrollbar-track {
+		background: #f1f1f1; /* Track color */
+	}
+
+	.faq-sidebar::-webkit-scrollbar-thumb {
+		background-color: #888; /* Thumb color */
+		border-radius: 5px;     /* Rounded corners for the thumb */
+		border: 1px solid #f1f1f1; /* Optional: creates a small padding effect */
+	}
+
+	.faq-sidebar::-webkit-scrollbar-thumb:hover {
+		background-color: #555; /* Change thumb color on hover */
 	}
 	.faq-main {
 	  margin: 0 20px 0 20px;
 	  max-width: 1000px;
 	  width: 100%;
       flex: 1;
-      padding: 30px;
+      padding: 0 30px 30px 30px;
       background: #fff;
-	  border-radius: 10px;
-	  border: 1px solid #f1f5fb;
-	  box-shadow: 0 4px 5px 0 rgba(36, 50, 66, .1);
+	  /* border-radius: 10px; */
+	  /* border: 1px solid #f1f5fb; */
+	  /* box-shadow: 0 4px 5px 0 rgba(36, 50, 66, .1); */
     }
 	.faq-main h1 {
       font-size: 2rem;
@@ -310,7 +386,30 @@ function display_faq_list_hierarchy_ajax( $atts ) {
       height: auto;
       object-fit: contain;
       margin: 20px 0;
+	  cursor: zoom-in;
     }
+	body.zoomed-overlay::before {
+		content: "";
+		position: fixed;
+		top: 0;
+		left: 0;
+		width: 100vw;
+		height: 100vh;
+		background: rgba(0, 0, 0, 0.8);
+		z-index: 9998;
+	}
+	.faq-main img.zoomed {
+		position: fixed;
+		top: 50%;
+		left: 50%;
+		transform: translate(-50%, -50%) scale(1.3);
+		transition: transform 0.3s ease;
+		max-width: 80%;
+		max-height: 80%;
+		object-fit: contain;
+		z-index: 9999;
+		cursor: zoom-out;
+	}
 	.faq-search-container {
 		margin-bottom: 15px;
 		position: relative;
@@ -411,9 +510,9 @@ function display_faq_list_hierarchy_ajax( $atts ) {
 		display: block !important;
 	}
 	.faq-children {
-		margin-left: 10px;
+		margin-left: 12px;
 		margin-top: 4px;
-		padding-left: 5px;
+		/* padding-left: 5px; */
 	}
 	.faq-guides-list {
 		list-style: none;
@@ -422,7 +521,7 @@ function display_faq_list_hierarchy_ajax( $atts ) {
 	}
 	.faq-guide-link {
 		display: block;
-		padding: 2px 4px;
+		padding: 4px 4px;
 		/* background: #fff; */
 		border-radius: 4px;
 		color: #000 !important;
@@ -448,6 +547,39 @@ function display_faq_list_hierarchy_ajax( $atts ) {
 	}
 	.faq-search-results li {
 		padding-bottom: 5px;
+	}
+	.faq-sidebar-item.highlight {
+		border-radius: 5px;
+		background-color: #f0f8ff !important;
+		transition: background-color 0.3s ease, border-color 0.3s ease;
+	}
+	.search-result-item a {
+		cursor: pointer;
+	}
+	.search-result-item .title {
+		font-weight: 500;
+	}
+	.search-result-item .faq-path {
+		font-weight: light;
+		font-size: 12px;
+		margin: 0 0 2px 0;
+	}
+	.search-result-item .additional-stats {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		font-weight: light;
+		font-size: 11px;
+	}
+	.search-result-item .p-feedback {
+		color: #5bb450;
+	}
+	.search-result-item .n-feedback {
+		color: red;
+	}
+	tr:has(td.hash-highlighted) {
+		border: 2px solid blue !important;
+    	transition: border 0.3s ease;
 	}
 	[id] {
         scroll-margin-top: 110px;
@@ -484,9 +616,9 @@ function display_faq_list_hierarchy_ajax( $atts ) {
 			<div id="faq-guide-content">
 				<?php
 				if ( ! empty( $active_guide_slug ) ) :
-					echo '<p>Loading guide...</p>';
+					echo '<p style="text-align: center;"><i class="fa fa-spinner fa-spin"></i> Loading guide...</p>';
 				else :
-					echo '<p>Select a guide to view its content.</p>';
+					echo '<p style="text-align: center;">Select a guide to view its content.</p>';
 				endif;
 				?>
 			</div>
@@ -499,6 +631,7 @@ function display_faq_list_hierarchy_ajax( $atts ) {
 			var searchInput = document.getElementById('faq-search');
 			var clearButton = document.getElementById('faq-clear-button');
 			var parentForm = searchInput.closest('form');
+
 			if (parentForm) {
 				parentForm.addEventListener('submit', function(e) {
 					e.preventDefault();
@@ -511,13 +644,80 @@ function display_faq_list_hierarchy_ajax( $atts ) {
 				} else {
 					clearButton.style.display = 'none';
 					sidebarListContainer.innerHTML = originalSidebar;
+					bindSearchIcons();
 				}
 			});
 			clearButton.addEventListener('click', function() {
 				searchInput.value = '';
 				clearButton.style.display = 'none';
 				sidebarListContainer.innerHTML = originalSidebar;
+				bindSearchIcons();
 			});
+
+			function bindSearchIcons() {
+				document.querySelectorAll('.search-icon').forEach(function(icon) {
+					icon.addEventListener('click', function(e) {
+						e.stopPropagation(); // Prevent other click events
+
+						var sidebarItem = e.target.closest('.faq-sidebar-item');
+						if (!sidebarItem) return;
+
+						// Check if this item is already highlighted.
+						if (sidebarItem.classList.contains('highlight')) {
+							// Deselect it and reset the FAQ list
+							sidebarItem.classList.remove('highlight');
+							sidebarListContainer.innerHTML = originalSidebar;
+							bindSearchIcons(); // Rebind the events on the restored DOM elements
+						} else {
+							// Remove highlight from any other highlighted sidebar items.
+							document.querySelectorAll('.faq-sidebar-item.highlight').forEach(function(item) {
+								if (item !== sidebarItem) {
+									item.classList.remove('highlight');
+								}
+							});
+							// Highlight the clicked sidebar item.
+							sidebarItem.classList.add('highlight');
+							// Move this highlighted item to the top of its container.
+							var parentList = sidebarItem.parentElement;
+							parentList.insertBefore(sidebarItem, parentList.firstChild);
+						}
+
+						// Optionally, scroll the search container into view and focus the input.
+						var searchContainer = document.querySelector('.faq-search-container');
+						if (searchContainer) {
+							searchContainer.scrollIntoView({ behavior: 'smooth', block: 'center' });
+						}
+						var searchInput = document.getElementById('faq-search');
+						if (searchInput) {
+							searchInput.focus();
+						}
+					});
+				});
+			}
+
+			// Bind search icon events initially.
+			bindSearchIcons();
+
+			document.addEventListener('click', function(e) {
+				var link = e.target.closest('.faq-guide-link');
+				if ( link ) {
+					e.preventDefault();
+					var guideIdentifier = link.getAttribute('data-guide-slug');
+					loadGuideContent( guideIdentifier );
+					// Remove 'active' class from all guide links.
+					document.querySelectorAll('.faq-guide-link').forEach(function(l) {
+						l.classList.remove('active');
+					});
+					// Mark this link as active.
+					link.classList.add('active');
+					var baseUrl = document.querySelector('.faq-component').getAttribute('data-baseurl');
+					history.pushState(null, '', baseUrl + guideIdentifier);
+					var faqComponent = document.querySelector('.faq-component');
+					var offset = faqComponent.getBoundingClientRect().top + window.pageYOffset - 120;
+					window.scrollTo({ top: offset, behavior: 'smooth' });
+				}
+			});
+
 			document.addEventListener('click', function(e) {
 				var header = e.target.closest('.faq-term-header');
 				if (header && header.parentElement && header.parentElement.classList.contains('faq-sidebar-item')) {
@@ -543,61 +743,62 @@ function display_faq_list_hierarchy_ajax( $atts ) {
 					}
 				}
 			});
-			document.addEventListener('click', function(e) {
-				if(e.target && e.target.classList.contains('faq-guide-link')) {
-					e.preventDefault();
-					var guideIdentifier = e.target.getAttribute('data-guide-slug');
-					loadGuideContent(guideIdentifier);
-					document.querySelectorAll('.faq-guide-link').forEach(function(link) {
-						link.classList.remove('active');
-					});
-					e.target.classList.add('active');
-					var baseUrl = document.querySelector('.faq-component').getAttribute('data-baseurl');
-					history.pushState(null, '', baseUrl + guideIdentifier);
-					var faqComponent = document.querySelector('.faq-component');
-					var offset = faqComponent.getBoundingClientRect().top + window.pageYOffset - 120;
-					window.scrollTo({ top: offset, behavior: 'smooth' });
-				}
-			});
+
 			function loadGuideContent( guideIdentifier ) {
                 var contentDiv = document.getElementById('faq-guide-content');
-                contentDiv.innerHTML = '<p>Loading guide content...</p>';
+                contentDiv.innerHTML = '<p style="text-align: center;"><i class="fa fa-spinner fa-spin"></i> Loading guide...</p>';
                 var data = 'action=load_guide_content&guide_slug=' + encodeURIComponent( guideIdentifier );
                 var xhr = new XMLHttpRequest();
                 xhr.open('POST', '<?php echo admin_url('admin-ajax.php'); ?>', true);
                 xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded; charset=UTF-8');
                 xhr.onload = function(){
-                    if ( xhr.status === 200 ) {
-                        try {
-                            var response = JSON.parse( xhr.responseText );
-                            if ( response.success ) {
-                                contentDiv.innerHTML = '<h2>' + response.data.title + '</h2>' + response.data.content;
-                                if (window.location.hash) {
-                                    setTimeout(function(){
-                                        var targetId = window.location.hash.substring(1);
-                                        var targetElem = document.getElementById(targetId);
-                                        if (targetElem) {
-                                            var headerOffset = 120;
-                                            var elementPosition = targetElem.getBoundingClientRect().top;
-                                            var offsetPosition = elementPosition + window.pageYOffset - headerOffset;
-                                            window.scrollTo({ top: offsetPosition, behavior: 'smooth' });
-                                        }
-                                    }, 100);
-                                }
-                            } else {
-                                contentDiv.innerHTML = '<p>Error: ' + response.data + '</p>';
-                            }
-                        } catch( e ) {
-                            contentDiv.innerHTML = '<p>Error parsing response.</p>';
-                        }
-                    } else {
-                        contentDiv.innerHTML = '<p>Error loading guide content.</p>';
-                    }
-                };
+				if ( xhr.status === 200 ) {
+					try {
+						var response = JSON.parse( xhr.responseText );
+						if ( response.success ) {
+							contentDiv.innerHTML = '<h2>' + response.data.title + '</h2>' + response.data.content;
+							if ( window.location.hash ) {
+								setTimeout(function(){
+									var targetId = window.location.hash.substring(1);
+									var targetElem = document.getElementById(targetId);
+									if ( targetElem ) {
+										var headerOffset = 120;
+										var elementPosition = targetElem.getBoundingClientRect().top;
+										var offsetPosition = elementPosition + window.pageYOffset - headerOffset;
+										window.scrollTo({ top: offsetPosition, behavior: 'smooth' });
+										
+
+										targetElem.classList.add('hash-highlighted');
+										setTimeout(function(){
+											targetElem.classList.remove('hash-highlighted');
+										}, 3000);
+									}
+								}, 100);
+							} else {
+								// If no hash is provided, scroll to the top of the page.
+								window.scrollTo({ top: 0, behavior: 'smooth' });
+							}
+							document.querySelectorAll('.faq-main img').forEach(function(img) {
+								img.addEventListener('click', function(e) {
+									e.target.classList.toggle('zoomed');
+									document.body.classList.toggle('zoomed-overlay');
+								});
+							});
+						} else {
+							contentDiv.innerHTML = '<p>Error: ' + response.data + '</p>';
+						}
+					} catch( e ) {
+						contentDiv.innerHTML = '<p>Error parsing response.</p>';
+					}
+				} else {
+					contentDiv.innerHTML = '<p>Error loading guide content.</p>';
+				}
+			};
                 xhr.send( data );
             }
 			function filterSidebarByResults(matchingSlugs) {
 				sidebarListContainer.innerHTML = originalSidebar;
+				bindSearchIcons();
 				var guideLinks = sidebarListContainer.querySelectorAll('.faq-guide-link');
 				guideLinks.forEach(function(link) {
 					var slug = link.getAttribute('data-guide-slug');
@@ -627,10 +828,26 @@ function display_faq_list_hierarchy_ajax( $atts ) {
 				});
 			}
 			function searchGuides(query) {
+				// Get the search button element
+				var searchButton = document.getElementById('faq-search-button');
+				// Save its original HTML so we can restore it later
+				var originalButtonHTML = searchButton.innerHTML;
+				
+				// Put the search bar into a loading state:
+				searchInput.disabled = true;
+				searchButton.disabled = true;
+				// Replace the search icon with a spinner (Font Awesome spinner)
+				searchButton.innerHTML = '<i class="fa fa-spinner fa-spin"></i>';
+				
 				var xhr = new XMLHttpRequest();
 				xhr.open('POST', '<?php echo admin_url('admin-ajax.php'); ?>', true);
 				xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded; charset=UTF-8');
 				xhr.onload = function(){
+					// Remove loading state after the request finishes.
+					searchInput.disabled = false;
+					searchButton.disabled = false;
+					searchButton.innerHTML = originalButtonHTML;
+					
 					if(xhr.status === 200) {
 						try {
 							var response = JSON.parse(xhr.responseText);
@@ -651,31 +868,90 @@ function display_faq_list_hierarchy_ajax( $atts ) {
 			function displaySearchResults(results) {
 				var html = '<ul class="faq-search-results">';
 				results.forEach(function(result) {
-					html += '<li><a href="#" class="faq-guide-link" data-guide-slug="' + result.guide_slug + '">' + result.title + '</a></li>';
+					html += '<li class="search-result-item"><a class="faq-guide-link" data-guide-slug="' + result.guide_slug + '"><span class="title">' + result.title + '</span>';
+					html += '<p class="faq-path"><em>' + result.full_path + '</em></p>'
+
+					html += '<div class="additional-stats">';
+					html += '<div class="views"><i class="fa-regular fa-eye"></i> ' + result.view_count + '</div>';
+					html += '<div><span class="p-feedback"><i class="fa-regular fa-thumbs-up"></i></i> ' + result.useful_count + '</span> ';
+					// html += '<span class="n-feedback"><i class="fa-regular fa-thumbs-down"></i> ' + result.notuseful_count + '</span>';
+					html += '</div>';
+					html += '</div>';
+
+					html += '</a></li>';
 				});
 				html += '</ul>';
 				sidebarListContainer.innerHTML = html;
 			}
+
 			searchInput.addEventListener('keydown', function(e) {
 				if (e.key === 'Enter') {
-					e.preventDefault();
-					e.stopPropagation();
 					var query = e.target.value.trim();
-					if(query === '') {
-						sidebarListContainer.innerHTML = originalSidebar;
-					} else {
-						searchGuides(query);
-					}
+					e.preventDefault();
+					processSearch(query);
 				}
 			});
 			document.getElementById('faq-search-button').addEventListener('click', function() {
 				var query = searchInput.value.trim();
-				if(query === '') {
-					sidebarListContainer.innerHTML = originalSidebar;
-				} else {
-					searchGuides(query);
-				}
+				processSearch(query);
 			});
+			function processSearch(query) {
+				if (query === '') {
+					sidebarListContainer.innerHTML = originalSidebar;
+					bindSearchIcons();
+				} else {
+					var highlightedItem = document.querySelector('.faq-sidebar-item.highlight');
+					if (highlightedItem) {
+						filterHighlightedSidebarItem(highlightedItem, query);
+					} else {
+						searchGuides(query);
+					}
+				}
+			};
+
+			function filterHighlightedSidebarItem(item, query) {
+				var guideLinks = item.querySelectorAll('.faq-guide-link');
+				guideLinks.forEach(function(link) {
+					// Hide guide items whose text doesn't match the query (case-insensitive)
+					if (link.textContent.toLowerCase().indexOf(query.toLowerCase()) === -1) {
+						var guideItem = link.closest('.faq-guide-item');
+						if (guideItem) {
+							guideItem.style.display = 'none';
+						}
+					} else {
+						var guideItem = link.closest('.faq-guide-item');
+						if (guideItem) {
+							guideItem.style.display = '';
+						}
+					}
+				});
+				
+				// Loop through all child FAQ sidebar items (child FAQ lists) and hide them if no guide items are visible.
+				var childFaqItems = item.querySelectorAll('.faq-sidebar-item');
+				childFaqItems.forEach(function(childItem) {
+					// Check if any guide items in this child are visible.
+					var anyVisible = Array.from(childItem.querySelectorAll('.faq-guide-item')).some(function(guideItem) {
+						return guideItem.style.display !== 'none';
+					});
+					// If none are visible, hide the child FAQ list.
+					if (!anyVisible) {
+						childItem.style.display = 'none';
+					} else {
+						childItem.style.display = '';
+					}
+				});
+				
+				// Expand all child lists within the highlighted item.
+				var childLists = item.querySelectorAll('.faq-children');
+				childLists.forEach(function(childList) {
+					childList.style.display = 'block';
+					// Add the expanded class to the chevron in the parent's header.
+					var headerChevron = childList.parentElement.querySelector('.faq-term-header .chevron');
+					if (headerChevron) {
+						headerChevron.classList.add('expanded');
+					}
+				});
+			}
 			<?php if ( ! empty( $active_guide_slug ) ) : ?>
 				document.addEventListener('DOMContentLoaded', function(){
 					var activeLink = document.querySelector('.faq-guide-link[data-guide-slug="<?php echo esc_js( $active_guide_slug ); ?>"]');
@@ -713,6 +989,13 @@ function build_faq_sidebar_ajax( $parent_id, $taxonomy, $atts, $level = 0 ) {
 		'hide_empty' => true,
 		'parent'     => $parent_id,
 	) );
+
+	// Adding in the administrator guides
+	if ($level == 0) {
+		$admin_guides = get_faq_term_by_halo_id( 47, $taxonomy );
+		array_push($terms, $admin_guides);
+	}
+
 	if ( empty( $terms ) || is_wp_error( $terms ) ) {
 		return '';
 	}
@@ -728,22 +1011,27 @@ function build_faq_sidebar_ajax( $parent_id, $taxonomy, $atts, $level = 0 ) {
 	} );
 	$output = '<ul class="faq-sidebar-list level-' . $level . '">';
 	foreach ( $terms as $term ) {
-		$children = build_faq_sidebar_ajax( $term->term_id, $taxonomy, $atts, $level + 1 );
+		$children_build = build_faq_sidebar_ajax( $term->term_id, $taxonomy, $atts, $level + 1 );
+		$children = $children_build[0];
+		$children_count = $children_build[1];
+
 		$guides_build   = build_guides_list_ajax( $term->term_id, $atts );
 		$guides = $guides_build[0];
 		$guides_count = $guides_build[1];
+
 		$has_children = ( $children || $guides ) ? true : false;
+
 		$output .= '<li class="faq-sidebar-item" data-term-id="' . esc_attr( $term->term_id ) . '">';
 
-		$collapsed = (count($terms) <= 10 && $guides_count <= 10 && $level == 0) ? 'block' : 'none';
-		$set_collapsed = (count($terms) <= 10 && $guides_count <= 10 && $level == 0) ? true : false;
+		$collapsed = ($children_count <= 10 && $guides_count <= 10 && $level == 0) ? 'block' : 'none';
+		$set_collapsed = ($children_count <= 10 && $guides_count <= 10 && $level == 0) ? true : false;
 
 		$search_icon = ($level == 0) ? ('<i class="fa-solid fa-magnifying-glass search-icon' . (($set_collapsed == true) ? ' expanded' : '') . '"></i>') : '';
 
 		if ( $has_children && $set_collapsed ) {
 			$output .= '<a href="#" class="faq-term-header" style="display: flex; justify-content: space-between;"><span class="term-title">' . esc_html( $term->name ) . '</span><div style="display: flex; align-items: right; gap: 7px;">' . $search_icon . '<i class="fa fa-chevron-right chevron expanded"></i></div></a>';
 		} else if ( $has_children ) {
-			$output .= '<a href="#" class="faq-term-header" style="display: flex; justify-content: space-between;"><span class="term-title">' . esc_html( $term->name ) . '</span><div style="display: flex; align-items: center; gap: 7px;"><span class="guide-count">' . $guides_count . '</span> ' . $search_icon . '<i class="fa fa-chevron-right chevron"></i></div></a>';
+			$output .= '<a href="#" class="faq-term-header" style="display: flex; justify-content: space-between;"><span class="term-title">' . esc_html( $term->name ) . '</span><div style="display: flex; align-items: center; gap: 7px;"><span class="guide-count"></span> ' . $search_icon . '<i class="fa fa-chevron-right chevron"></i></div></a>';
 		}
 		else {
 			$output .= '<a href="#" class="faq-term-header"><span class="term-title">' . esc_html( $term->name ) . '</span></a>';
@@ -761,7 +1049,7 @@ function build_faq_sidebar_ajax( $parent_id, $taxonomy, $atts, $level = 0 ) {
 		$output .= '</li>';
 	}
 	$output .= '</ul>';
-	return $output;
+	return [$output, count($terms)];
 }
 
 /**
