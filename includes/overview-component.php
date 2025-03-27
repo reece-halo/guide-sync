@@ -7,10 +7,11 @@ if ( ! defined( 'ABSPATH' ) ) {
 /**
  * Enqueue Font Awesome for the FAQ components.
  */
-function faq_enqueue_fontawesome() {
-	wp_enqueue_style( 'font-awesome', 'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css', array(), '6.4.0' );
-}
-add_action( 'wp_enqueue_scripts', 'faq_enqueue_fontawesome' );
+add_action( 'wp_enqueue_scripts', function() {
+    wp_dequeue_style( 'elementor-icons' );
+    wp_deregister_style( 'elementor-icons' );
+    wp_enqueue_style( 'custom-fontawesome', 'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css', array(), '6.4.0' );
+}, 20 );
 
 /**
  * Register rewrite rules.
@@ -776,7 +777,9 @@ function display_faq_list_hierarchy_ajax( $atts ) {
 								}, 100);
 							} else {
 								// If no hash is provided, scroll to the top of the page.
-								window.scrollTo({ top: 0, behavior: 'smooth' });
+								var faqComponent = document.querySelector('.faq-component');
+								var offset = faqComponent.getBoundingClientRect().top + window.pageYOffset - 120;
+								window.scrollTo({ top: offset, behavior: 'smooth' });
 							}
 							document.querySelectorAll('.faq-main img').forEach(function(img) {
 								img.addEventListener('click', function(e) {
@@ -902,7 +905,19 @@ function display_faq_list_hierarchy_ajax( $atts ) {
 				} else {
 					var highlightedItem = document.querySelector('.faq-sidebar-item.highlight');
 					if (highlightedItem) {
-						filterHighlightedSidebarItem(highlightedItem, query);
+						var searchButton = document.getElementById('faq-search-button');
+						var originalButtonHTML = searchButton.innerHTML;
+						
+						searchInput.disabled = true;
+						searchButton.disabled = true;
+						searchButton.innerHTML = '<i class="fa fa-spinner fa-spin"></i>';
+
+						setTimeout(function() {
+							searchInput.disabled = false;
+							searchButton.disabled = false;
+							searchButton.innerHTML = originalButtonHTML;
+							filterHighlightedSidebarItem(highlightedItem, query);
+						}, 500);
 					} else {
 						searchGuides(query);
 					}
