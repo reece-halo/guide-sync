@@ -305,7 +305,7 @@ function display_faq_list_hierarchy_ajax( $atts ) {
 		display: flex;
 		align-items: flex-start;
 		/* gap: 50px; */
-		max-width: 1360px;
+		max-width: 1380px;
 		width: 100%;
 		margin: 30px auto;
 		background: #fff;
@@ -318,10 +318,8 @@ function display_faq_list_hierarchy_ajax( $atts ) {
         overflow-y: auto;
         position: sticky;
         top: 100px;
-        max-height: calc(100vh - 200px);
+        max-height: calc(100vh - 160px);
         align-self: flex-start;
-
-		margin-left: 20px;
 
 		border-radius: 10px;
 		border: 1px solid #f1f5fb;
@@ -492,6 +490,9 @@ function display_faq_list_hierarchy_ajax( $atts ) {
 	.level-0 > .faq-sidebar-item > .faq-term-header {
 		font-weight: 500;
 	}
+	.level-2 > .faq-sidebar-item > .faq-term-header {
+		font-size: 14px;
+	}
 	.faq-term-header .chevron {
 		margin-right: 10px;
 		font-size: 12px;
@@ -581,6 +582,59 @@ function display_faq_list_hierarchy_ajax( $atts ) {
 	tr:has(td.hash-highlighted) {
 		border: 2px solid blue !important;
     	transition: border 0.3s ease;
+	}
+	.faq-overlay {
+		position: fixed;
+		top: 0;
+		left: 0;
+		width: 100vw;
+		height: 100vh;
+		background: rgba(0, 0, 0, 0.6);
+		z-index: 900;
+		opacity: 0;
+		transition: opacity 0.3s ease;
+	}
+	.faq-overlay.show {
+		opacity: 1;
+	}
+	.faq-popup {
+		position: absolute;
+		background: #fff;
+		color: #333;
+		padding: 10px 15px;
+		border: 1px solid #ccc;
+		border-radius: 5px;
+		box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+		z-index: 1000;
+		font-family: sans-serif;
+		font-size: 14px;
+		opacity: 0;
+		transform: translateY(-10px);
+		transition: opacity 0.3s ease, transform 0.3s ease;
+	}
+	.faq-popup.show {
+		opacity: 1;
+		transform: translateY(0);
+	}
+	/* Arrow styling */
+	.faq-popup::after {
+		content: "";
+		position: absolute;
+		bottom: -8px; /* Position the arrow below the popup */
+		left: 20px;  /* Adjust to align the arrow with the search icon */
+		border-width: 8px;
+		border-style: solid;
+		border-color: #fff transparent transparent transparent;
+	}
+	.highlighted-search-icon {
+		position: relative;
+		z-index: 1101;
+		animation: pulseHighlight 1.5s infinite;
+	}
+	@keyframes pulseHighlight {
+		0% { box-shadow: 0 0 0 0 rgba(188, 255, 4, 0.8); }
+		70% { box-shadow: 0 0 0 10px rgba(255,200,0,0); }
+		100% { box-shadow: 0 0 0 0 rgba(255,200,0,0); }
 	}
 	[id] {
         scroll-margin-top: 110px;
@@ -719,6 +773,85 @@ function display_faq_list_hierarchy_ajax( $atts ) {
 				}
 			});
 
+			if (!localStorage.getItem('faqPopupShown')) {
+				document.addEventListener('DOMContentLoaded', function(){
+					// Disable scrolling while popup is active.
+					document.body.style.overflow = 'hidden';
+					
+					// Create and add the dimming overlay.
+					var overlay = document.createElement('div');
+					overlay.className = 'faq-overlay';
+					document.body.appendChild(overlay);
+					setTimeout(function(){
+						overlay.classList.add('show');
+					}, 10);
+					
+					// Find the first search icon (adjust selector as needed).
+					var searchIcon = document.querySelector('.faq-term-header .search-icon');
+					if (searchIcon) {
+						// Add a highlight class to the search icon.
+						searchIcon.classList.add('highlighted-search-icon');
+						
+						// Create the popup element.
+						var popup = document.createElement('div');
+						popup.className = 'faq-popup';
+						popup.innerHTML = '<i class="fa-regular fa-lightbulb"></i> Pssst... click any search icon <i class="fa-solid fa-magnifying-glass"></i> to search directly within an FAQ list!';
+						
+						// Temporarily hide to compute dimensions.
+						popup.style.visibility = 'hidden';
+						document.body.appendChild(popup);
+						
+						// Get the search icon's position.
+						var rect = searchIcon.getBoundingClientRect();
+						var popupHeight = popup.offsetHeight;
+						
+						// Position the popup above the search icon.
+						popup.style.top = (rect.top - popupHeight - 20 + window.pageYOffset) + 'px';
+						popup.style.left = (rect.left + window.pageXOffset) + 'px';
+						popup.style.visibility = 'visible';
+						
+						// Allow the CSS transition to trigger.
+						setTimeout(function(){
+							popup.classList.add('show');
+						}, 50);
+						
+						// Dismiss function
+						function dismissPopup() {
+							popup.classList.remove('show');
+							overlay.classList.remove('show');
+							// Re-enable scrolling.
+							document.body.style.overflow = '';
+							if (searchIcon) {
+								searchIcon.classList.remove('highlighted-search-icon');
+							}
+							setTimeout(function(){
+								popup.remove();
+								overlay.remove();
+								localStorage.setItem('faqPopupShown', 'true');
+							}, 300);
+						}
+						
+						// Remove popup on click.
+						popup.addEventListener('click', dismissPopup);
+						
+						// Automatically dismiss after 5 seconds.
+						setTimeout(function(){
+							if (popup.parentNode) {
+								dismissPopup();
+							}
+						}, 10000);
+					} else {
+						// If search icon isn't found, remove overlay after a delay.
+						setTimeout(function(){
+							overlay.classList.remove('show');
+							overlay.remove();
+							document.body.style.overflow = '';
+							localStorage.setItem('faqPopupShown', 'true');
+						}, 5000);
+					}
+				});
+			}
+
 			document.addEventListener('click', function(e) {
 				var header = e.target.closest('.faq-term-header');
 				if (header && header.parentElement && header.parentElement.classList.contains('faq-sidebar-item')) {
@@ -783,8 +916,30 @@ function display_faq_list_hierarchy_ajax( $atts ) {
 							}
 							document.querySelectorAll('.faq-main img').forEach(function(img) {
 								img.addEventListener('click', function(e) {
-									e.target.classList.toggle('zoomed');
-									document.body.classList.toggle('zoomed-overlay');
+									// If the image is not already zoomed, zoom it in
+									if (!img.classList.contains('zoomed')) {
+										img.classList.add('zoomed');
+										document.body.classList.add('zoomed-overlay');
+										// Prevent this click from triggering the global handler immediately
+										e.stopPropagation();
+
+										// Use a short delay to attach a one‑time click listener on the document
+										setTimeout(function(){
+											document.addEventListener('click', function dismissZoom(event) {
+												// Remove the zoomed state and overlay
+												if (img.classList.contains('zoomed')) {
+													img.classList.remove('zoomed');
+													document.body.classList.remove('zoomed-overlay');
+												}
+												// Remove this global listener so it only runs once
+												document.removeEventListener('click', dismissZoom);
+											});
+										}, 0);
+									} else {
+										// If already zoomed, clicking the image directly also dismisses the zoom
+										img.classList.remove('zoomed');
+										document.body.classList.remove('zoomed-overlay');
+									}
 								});
 							});
 						} else {
