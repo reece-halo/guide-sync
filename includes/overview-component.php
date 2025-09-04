@@ -142,11 +142,32 @@ add_action( 'wp_ajax_faq_search_guides', 'faq_search_guides' );
 add_action( 'wp_ajax_nopriv_faq_search_guides', 'faq_search_guides' );
 function faq_search_guides() {
     $search_query = isset( $_POST['search_term'] ) ? sanitize_text_field( $_POST['search_term'] ) : '';
+	$product = isset($_POST['product']) ? sanitize_title( wp_unslash( $_POST['product'] ) ) : '';
     if ( empty( $search_query ) ) {
         wp_send_json_error( 'No search term provided.' );
     }
 
-    $api_url  = 'https://halo.haloservicedesk.com/api/KBArticle?isportal=true&search=' . $search_query . '&pageinate=true&page_size=100&page_no=1';
+	$faqs = '';
+	if ( ! empty( $product ) ) {
+		$faqs .= '&faqlists=';
+
+		switch ($product) {
+			case "haloitsm":
+				$faqs .= '';
+				break;
+			case "halopsa":
+				$faqs .= '';
+				break;
+			case "halocrm":
+				$faqs .= '';
+				break;
+			default:
+				$faqs = '';
+				break;
+		}
+	}
+
+    $api_url  = 'https://halo.haloservicedesk.com/api/KBArticle?isportal=true&search=' . $search_query . '&pageinate=true&page_size=100&page_no=1' . $faqs;
     $response = wp_remote_get( $api_url );
 
     if ( is_wp_error( $response ) ) {
@@ -198,6 +219,7 @@ function faq_search_guides() {
 
         $results[] = array(
             'title'         => $article['name'],
+			'apicall'         => $api_url,
             'excerpt'       => $article['name'],
             'permalink'     => $permalink,
             'guide_slug'    => $article['id'],
@@ -1021,7 +1043,8 @@ function display_faq_list_hierarchy_ajax( $atts ) {
 						console.error('Error in AJAX request');
 					}
 				};
-				xhr.send('action=faq_search_guides&search_term=' + encodeURIComponent(query));
+				const product = window.location.pathname.split('/').filter(Boolean)[0] || '';
+				xhr.send('action=faq_search_guides&search_term=' + encodeURIComponent(query) + '&product=' + encodeURIComponent(product));
 			}
 			function displaySearchResults(results) {
 				var html = '<ul class="faq-search-results">';
