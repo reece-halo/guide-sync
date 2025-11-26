@@ -177,18 +177,21 @@ function delete_removed_articles( $synced_ids ) {
 
 function build_content( $details ) {
     $htmlContent = '';
+    
+    $descriptionEncoded = str_replace("\\", "&#92;", $details['description_html']);
+    $resolutionEncoded = str_replace("\\", "&#92;", $details['resolution_html']);
 
     // Add the description section if it exists
     if ( ! empty( $details['description_html'] ) ) {
         $htmlContent .= '<div class="guide-description">';
-        $htmlContent .= $details['description_html'];
+        $htmlContent .= $descriptionEncoded;
         $htmlContent .= '</div>';
     }
 
     // Add the resolution section if it exists
     if ( ! empty( $details['resolution_html'] ) ) {
         $htmlContent .= '<div class="guide-resolution">';
-        $htmlContent .= $details['resolution_html'];
+        $htmlContent .= $resolutionEncoded;
         $htmlContent .= '</div>';
     }
 
