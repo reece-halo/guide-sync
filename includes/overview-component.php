@@ -1188,7 +1188,7 @@ function build_faq_sidebar_ajax( $parent_id, $taxonomy, $atts, $level = 0 ) {
 		$admin_guides = get_faq_term_by_halo_id( 47, $taxonomy );
 		array_push($terms, $admin_guides);
 		
-		$on_prem_guides = get_faq_term_by_halo_id( 364, $taxonomy );
+		$on_prem_guides = get_faq_term_by_halo_id( 310, $taxonomy );
 		array_push($terms, $on_prem_guides);
 	}
 
